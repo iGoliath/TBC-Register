@@ -11,6 +11,10 @@ def show_frame(frame):
 	
 def enter_admin_frame():
 	show_frame(password_frame)
+
+def enter_register_frame():
+		show_frame(register_frame)
+		usr_entry.focus_set()
 	
 	
 
@@ -22,9 +26,11 @@ pwd_variable = tk.StringVar()
 
 
 mode_select_frame = tk.Frame(root, width=1024, height=600)
-register_frame = tk.Frame(root, width=1024, height=600)
+register_frame = tk.Frame(root, width=1024, height=600, bg='black')
 admin_frame = tk.Frame(root, width=1024, height=600)
 password_frame = tk.Frame(root, width=1024, height=600)
+
+#root.attributes('-fullscreen', True)
 
 for frame in (mode_select_frame, register_frame, admin_frame):
 	frame.grid(row=0, column=0, sticky='nsew')
@@ -32,14 +38,16 @@ for frame in (mode_select_frame, register_frame, admin_frame):
 
 # Widgets for "Mode select screen", aka screen user is meant to see upon "boot"
 tk.Label(mode_select_frame, text="Please select a mode: ")
-tk.Button(mode_select_frame, text="Enter Register Mode", command=lambda: show_frame(register_frame)).pack(padx=150, pady=150)
-tk.Button(mode_select_frame, text="Enter Admin Mode", command=lambda: show_frame(admin_frame)).pack(padx=250, pady=250)
+register_mode_button = tk.Button(mode_select_frame, text="Enter Register Mode", font=("Arial", 50), command=lambda: enter_register_frame()).grid(column=0, row=1)
+admin_mode_button = tk.Button(mode_select_frame, text="Enter Admin Mode", font=("Arial", 50), command=lambda: show_frame(admin_frame)).grid(column=0, row=0)
+
 
 # Widgets for "Register Mode" 
-tk.Label(register_frame, text="Register Mode", padx=500, pady=150)
-tk.Button(register_frame, text="Go Back", command=lambda: show_frame(mode_select_frame)).pack(padx=150, pady=150)
-button = tk.Button(register_frame, text = "Make Transaction", command = mT.make_transaction)
-button.place(x=50, y=50)
+
+register_frame.grid_rowconfigure(0, weight=1)
+register_frame.grid_columnconfigure(0, weight=1)
+usr_entry = tk.Entry(register_frame, font=("Arial", 75), bg="black", fg="#68FF00", justify="right", width=16)
+usr_entry.grid(column=0, row=0, sticky='ew', padx=2, columnspan=1)
 
 # Widgets for "Admin Mode" 
 admin_label = tk.Label(admin_frame, text="Administrative Functions", fg="green", font=("Arial", 24, "bold"))
@@ -49,7 +57,7 @@ admin_frame.grid_columnconfigure(1, weight=1)
 admin_frame.grid_rowconfigure(0, weight=1)
 admin_back_button = tk.Button(admin_frame, text="Go Back", font=("Arial", 50), command=lambda: show_frame(mode_select_frame)).pack(anchor="nw")
 
-show_frame(admin_frame)
+show_frame(mode_select_frame)
 
 root.mainloop()
 

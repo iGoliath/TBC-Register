@@ -1,34 +1,28 @@
 import sqlite3
 from datetime import datetime
 
-def make_transaction(entered_barcode):
 
-	conn = sqlite3.connect('test1')
-	c  = conn.cursor()
-
-	subtotal = tax = total = 0
-
-	while True:
-
-		c.execute("SELECT * FROM INVENTORY2 WHERE BARCODE = ?", (entered_barcode,))
-		results = c.fetchall()
-		print(f"DEBUG: Query returned {len(results)} rows.")
+class Transaction:
+	def __init__(self, sql_db="test1"):
+		self.conn = sqlite3.connect(sql_db)
+		self.c = self.conn.cursor()
+		self.subtotal = self.tax = self.total = 0
+		self.items_list = []
+		
+	def __del__(self):
+		self.conn.commit()
+		self.conn.close()
+		
+	def sell_item(self, entered_barcode):
+		self.c.execute("SELECT * FROM INVENTORY2 WHERE BARCODE = ?", (entered_barcode,))
+		results = self.c.fetchall()
 		row = results[0]
-		item_name = row[1]
-		item_price = row[2]
-		taxable = row[3]
-
-
-		subtotal += item_price
-		tax = subtotal * 0.06625
-		total = subtotal + tax
+		#Row[1] = item_name, Row[2] = item_price, Row[3] = taxable
+		item_info = [row[1], row[2], row[3], entered_barcode]
+		self.subtotal += item_info[1]
+		if item_info[2] == 1:
+			self.tax += item_info[1] * 0.06625
+		self.total = round(self.subtotal + self.tax, 2)
+		return self.total
+		
 	
-		print(total)
-
-	formatted = "{:.2f}".format(total)
-	print("Total is: $", formatted)
-	conn.commit()
-	conn.close() 
-	
-if __name__ == "__main__":
-	make_transaction()

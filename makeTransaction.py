@@ -1,17 +1,22 @@
 import sqlite3
 from datetime import datetime
 
+date = datetime.today().strftime('%Y-%m-%d')
 
 class Transaction:
 	def __init__(self, sql_db="test1"):
-		self.conn = sqlite3.connect(sql_db)
-		self.c = self.conn.cursor()
-		self.subtotal = self.tax = self.total = 0
+		self.conn_inventory = sqlite3.connect(sql_db)
+		self.c = self.conn_inventory.cursor()
+		self.subtotal = 0
+		self.tax = 0
+		self.total = 0
+		self.cash_used = 0
+		self.cc_used = 0
 		self.items_list = []
 		
 	def __del__(self):
-		self.conn.commit()
-		self.conn.close()
+		self.conn_inventory.commit()
+		self.conn_inventory.close()
 		
 	def sell_item(self, entered_barcode):
 		self.c.execute("SELECT * FROM INVENTORY2 WHERE BARCODE = ?", (entered_barcode,))
@@ -23,6 +28,6 @@ class Transaction:
 		if item_info[2] == 1:
 			self.tax += item_info[1] * 0.06625
 		self.total = round(self.subtotal + self.tax, 2)
-		return self.total
+		return self.total, item_info[0], item_info[1], item_info[2]
 		
 	

@@ -1,14 +1,13 @@
 import tkinter as tk
 from makeTransaction import *
 from time import sleep
+from datetime import datetime
 
 trans = Transaction()
+date = datetime.today().strftime('%Y-%m-%d')
 
 
-def on_key_press(event):
-	key = event.keysym
-	print(f"Key pressed: {key}")
-	
+
 def show_frame(frame):
 	frame.tkraise()
 	
@@ -16,21 +15,20 @@ def enter_admin_frame():
 	show_frame(password_frame)
 
 def enter_register_frame():
-		show_frame(register_frame)
-		usr_entry.focus_force()
-		
-def on_enter(event=None):
-	process_sale()
+	show_frame(register_frame)
+	usr_entry.focus_force()
 
 
-def process_sale():
+def process_sale(event=None):
 	barcode = usr_entry.get()
 	usr_entry.delete(0, tk.END)
-	total = trans.sell_item(barcode)
+	total, item_name, item_price, taxable = trans.sell_item(barcode)
 	total_entry.delete(0, tk.END)
 	total_entry.insert(0, total)
+	sale_info = item_name + "\t\t\t" + str(item_price) + " " + str(taxable) + "\n"
+	sale_items.insert(tk.END, sale_info)
 	
-	
+#def complete_sale(event=None):
 	
 	
 
@@ -46,7 +44,10 @@ register_frame = tk.Frame(root, width=1024, height=600, bg='black')
 admin_frame = tk.Frame(root, width=1024, height=600)
 password_frame = tk.Frame(root, width=1024, height=600)
 
-# root.attributes('-fullscreen', True)
+
+#root.attributes("-fullscreen", True)
+
+
 
 for frame in (mode_select_frame, register_frame, admin_frame):
 	frame.grid(row=0, column=0, sticky='nsew')
@@ -64,12 +65,14 @@ register_frame.grid_rowconfigure(0, weight=1)
 register_frame.grid_columnconfigure(0, weight=1)
 usr_entry = tk.Entry(register_frame, font=("Arial", 75), bg="black", fg="#68FF00", justify="right", width=16)
 usr_entry.grid(column=0, row=0, sticky='ew', padx=2, columnspan=1)
-usr_entry.bind("<Tab>", on_enter)
-usr_entry.bind("<Return>", on_enter)
+usr_entry.bind("<Return>", process_sale)
 register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())
 register_quit_button.grid(column=0, row=1, sticky='e')
 total_entry = tk.Entry(register_frame)
 total_entry.grid(column = 0, row = 2, sticky='w')
+sale_items = tk.Text(register_frame)
+sale_items.grid(column = 0, row = 2, sticky='e')
+
 
 # Widgets for "Admin Mode" 
 admin_label = tk.Label(admin_frame, text="Administrative Functions", fg="green", font=("Arial", 24, "bold"))

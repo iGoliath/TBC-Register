@@ -1,18 +1,23 @@
 import sqlite3
 
+class AddToInventory:
+	
+	def __init__(self, sql_db="test1"):
+		self.name = ""
+		self.price = 0.0
+		self.barcode = 0
+		self.taxable = 0
+		self.quantity = 0
+		self.conn = sqlite3.connect('test1')
+		self.c = self.conn.cursor()
+		
+	def __del__(self):
+		self.conn.close()
 
-conn = sqlite3.connect('test1')
 
-c = conn.cursor()
-
-barcode_input = input("Please scan the hecking barcode (Hecker!!!): ")
-name_input = input("Please enter the name of the item: ")
-price_input = input("Please enter the price of the item: ")
-taxable_input = input("Please enter if item is taxable: ")
-
-c.execute("INSERT INTO INVENTORY2 (item_name, item_price, taxable, barcode) VALUES (?, ?, ?, ?)", (name_input, price_input, taxable_input, barcode_input))
-
-conn.commit()
-conn.close()
+	def commit_item(self):
+		self.c.execute("INSERT INTO INVENTORY2 (item_name, item_price, taxable, barcode) VALUES (?, ?, ?, ?)", (self.name, self.price, self.taxable, self.barcode))
+		self.conn.commit()		
+		
 
 

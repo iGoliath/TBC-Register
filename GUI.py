@@ -8,7 +8,12 @@ trans = Transaction()
 date = datetime.today().strftime('%Y-%m-%d')
 add_item_object = AddToInventory()
 index = 0
+reentering = False
 
+#conn = sqlite3.connect("TBCReg.db")
+
+	
+	
 
 def show_frame(frame):
 	frame.tkraise()
@@ -39,7 +44,8 @@ def process_sale(event=None):
 	sale_info = item_name + "\t" + "$" + str(item_price) + " " + str(taxable) + "\n"
 	sale_items.insert(tk.END, sale_info)
 	
-#def complete_sale(event=None):
+def complete_sale(event=None):
+	trans.complete_transaction()
 
 def yes_button_logic():
 	global index
@@ -55,9 +61,6 @@ def yes_button_logic():
 		add_item_entry.delete(0, tk.END)
 		add_item_entry.insert(tk.END, "yes")
 		on_add_item_enter()
-	else:
-		print("YES BUTTON ERROR")
-	print(index)
 	
 def no_button_logic():
 	global index
@@ -73,48 +76,93 @@ def no_button_logic():
 		add_item_entry.delete(0, tk.END)
 		add_item_entry.insert(tk.END, "no")
 		on_add_item_enter()
-	else:
-		print("BUTTON ERROR")
 		
-#def reenter_button_pressed(which_button):
+def reenter_button_pressed(which_button):
+	reenter_frame.grid_forget()
+	add_item_entry.grid(column=1, row=1, sticky='ew', pady=15)
+	add_item_button.grid(column=1, row=2, sticky='ew')
+	global index
+	global reentering
+	reentering = True
+	match which_button:
+		case "barcode":
+			index=0
+			add_item_label.config(text="Please enter item's Barcode:")
+		case "name":
+			index=1
+			add_item_label.config(text="Please enter the item's name:")
+		case "price":
+			index=2
+			add_item_label.config(text="Please enter the item's price:")
+		case "taxable":
+			index=3
+			add_item_label.config(text="Is the item taxable?")
+			add_item_entry.grid_forget()
+			add_item_button.grid_forget()
+			yes_no.grid(column=1, row=4, sticky='nsew')
+		case "quantity":
+			index=4
+			add_item_label.config(text="Please enter the Quantity:")
+			
+			
 	
 	
-
 
 def on_add_item_enter(event=None):
 	item_info_entered = add_item_entry.get().strip()
 	add_item_entry.delete(0, tk.END)
 	global index
 	global add_item_object
+	global reentering
 	
 	match index:
 		case 0:
 			add_item_object.barcode = item_info_entered
-			add_item_label.config(text="Please enter item's name:")
-			index+=1
+			if not reentering:
+				add_item_label.config(text="Please enter item's name:")
+				index+=1
+			elif reentering:
+				index=4
+				on_add_item_enter()
 		case 1:
 			add_item_object.name = item_info_entered
-			add_item_label.config(text="Please enter item's price:")
-			index+=1
+			if not reentering:
+				add_item_label.config(text="Please enter item's price:")
+				index+=1
+			elif reentering:
+				index=4
+				on_add_item_enter()
 		case 2:
 			add_item_object.price = item_info_entered
-			add_item_label.config(text="Is the Item Taxable?")
-			yes_button.grid(column=0, row=0, sticky='nsew', padx=10)
-			no_button.grid(column=1, row=0, sticky='nsew', padx=10)
-			add_item_button.grid_forget()
-			add_item_entry.grid_forget()
-			index+=1
+			if not reentering:
+				add_item_label.config(text="Is the item Taxable?")
+				yes_no.grid(column=1, row=4, sticky='nsew')
+				add_item_button.grid_forget()
+				add_item_entry.grid_forget()
+				index+=1
+			elif reentering:
+				index=4
+				on_add_item_enter()
 		case 3:
 			add_item_object.taxable = item_info_entered
-			yes_button.grid_forget()
-			no_button.grid_forget()
-			add_item_entry.grid(column=1, row=1, sticky='ew', pady=15)
-			add_item_button.grid(column=1, row=2, sticky='ew')
-			add_item_label.config(text="Please enter the quantity:")
-			index+=1
+			if not reentering:
+				yes_no.grid_forget()
+				add_item_entry.grid(column=1, row=1, sticky='ew', pady=15)
+				add_item_button.grid(column=1, row=2, sticky='ew')
+				add_item_label.config(text="Please enter the quantity:")
+				index+=1
+			elif reentering:
+				index=4
+				on_add_item_enter()
 		case 4:
-	
-			add_item_object.quantity = item_info_entered
+			add_item_label_text = add_item_label.cget("text")
+			if not reentering:
+				add_item_object.quantity = item_info_entered
+			elif reentering and add_item_label_text == "Please enter the Quantity:":
+				add_item_object.quantity = item_info_entered
+				reentering = False
+			else:
+				reentering = False
 			index+=1
 			add_item_label.config(text="Confirm item info is correct: ")
 			confirm_string = ("Name: " + add_item_object.name + "\nPrice: " + str(add_item_object.price) + " | \tBarcode: " + str(add_item_object.barcode) + "\nQuantity: " + str(add_item_object.quantity) + " | \tTaxable?: ")
@@ -127,8 +175,8 @@ def on_add_item_enter(event=None):
 			add_item_entry.grid_forget()
 			add_item_button.grid_forget()
 			item_info_confirmation.grid(column=1, row=1, sticky='ew', padx=5)
-			yes_button.grid(column=0, row=0, sticky='nsew', padx=10)
-			no_button.grid(column=1, row=0, sticky='nsew', padx=10)
+			yes_no.grid(column=1, row=4, sticky='nsew')
+			item_info_confirmation.delete("1.0", "end")
 			item_info_confirmation.insert(tk.END, confirm_string)
 		case 5:
 			if item_info_entered.lower() in ('yes', 'y'):
@@ -144,10 +192,8 @@ def on_add_item_enter(event=None):
 			elif item_info_entered.lower() in ('no', 'n'):
 				add_item_label.config(text="What would you like to change?")
 				reenter_frame.grid(column = 1, row=1, sticky='nsew')
-				yes_button.grid_forget()
-				no_button.grid_forget()
+				yes_no.grid_forget()
 				item_info_confirmation.grid_forget()
-				index+=2
 			
 		case 6:
 			if item_info_entered.lower() in ('yes', 'y'):
@@ -155,12 +201,13 @@ def on_add_item_enter(event=None):
 				add_item_label.config(text="Please enter the item's barcode: ", font=("Arial", 50))
 				add_item_button.grid(column=1, row=2, sticky='ew')
 				add_item_entry.grid(column=1, row=1, sticky='ew', pady=15)
-				yes_button.grid_forget()
-				no_button.grid_forget()
+				yes_no.grid_forget()
 			elif item_info_entered.lower() in ('no', 'n'):
 				del add_item_object
 				show_frame(admin_frame)
+			
 		case _:
+
 			add_item_entry.delete(0, tk.END)
 			add_item_entry.insert(tk.END, "ERROR")
 	
@@ -202,6 +249,7 @@ admin_mode_button = tk.Button(mode_select_frame, text="Enter Admin Mode", font=(
 usr_entry = tk.Entry(register_frame, font=("Arial", 75), text="$0.00", bg="black", fg="#68FF00", justify="right", width=16)
 usr_entry.grid(column=0, row=0, sticky='ew', padx=2, columnspan=1)
 usr_entry.bind("<Return>", process_sale)
+usr_entry.bind("<Shift_R>", complete_sale)
 
 # Quit Button
 register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())
@@ -253,31 +301,34 @@ item_info_confirmation = tk.Text(add_item_frame, font=("Arial", 40), width=6, he
 yes_no = tk.Frame(add_item_frame)
 yes_no.grid_columnconfigure(0, weight=1)
 yes_no.grid_columnconfigure(1, weight=1)
-yes_no.grid(column=1, row=4, sticky='nsew')
+
 
 yes_button = tk.Button(yes_no, text="Yes", font=("Arial", 150), command= lambda: yes_button_logic())
 
 no_button = tk.Button(yes_no, text="No", font=("Arial", 150), command=lambda: no_button_logic())
 show_frame(mode_select_frame)
 
+yes_button.grid(column=0, row=0, sticky='nsew', padx=10)
+no_button.grid(column=1, row=0, sticky='nsew', padx=10)
+
 reenter_frame = tk.Frame(add_item_frame)
 reenter_frame.grid_columnconfigure(0, weight=1)
 reenter_frame.grid_columnconfigure(1, weight=1)
 
 
-name_button = tk.Button(reenter_frame, text="Name", font=("Arial", 75))
+name_button = tk.Button(reenter_frame, text="Name", font=("Arial", 75), command = lambda: reenter_button_pressed("name"))
 name_button.grid(row=0, column=0, sticky='nsew')
 
-price_button = tk.Button(reenter_frame, text="Price", font=("Arial", 75))
+price_button = tk.Button(reenter_frame, text="Price", font=("Arial", 75), command = lambda: reenter_button_pressed("price"))
 price_button.grid(row=0, column=1, sticky='nsew')
 
-barcode_button = tk.Button(reenter_frame, text="Barcode", font=("Arial", 75))
+barcode_button = tk.Button(reenter_frame, text="Barcode", font=("Arial", 75), command = lambda: reenter_button_pressed("barcode"))
 barcode_button.grid(row=1, column=0, sticky='nsew')
 
-taxable_button = tk.Button(reenter_frame, text="Taxable", font=("Arial", 75))
+taxable_button = tk.Button(reenter_frame, text="Taxable", font=("Arial", 75), command = lambda: reenter_button_pressed("taxable"))
 taxable_button.grid(row=1, column=1, sticky='nsew')
 
-quantity_button = tk.Button(reenter_frame, text="Quantity", font=("Arial", 90))
+quantity_button = tk.Button(reenter_frame, text="Quantity", font=("Arial", 90), command = lambda: reenter_button_pressed("quantity"))
 quantity_button.grid(row=2, column=0, columnspan=2)
 
 

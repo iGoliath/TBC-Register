@@ -16,7 +16,7 @@ class AddToInventory:
 
 
 	def commit_item(self):
-		self.c.execute("INSERT INTO INVENTORY2 (item_name, item_price, taxable, barcode) VALUES (?, ?, ?, ?)", (self.name, self.price, self.taxable, self.barcode))
+		self.c.execute("INSERT INTO INVENTORY2 (item_name, item_price, taxable, barcode, quantity) VALUES (?, ?, ?, ?, ?)", (self.name, self.price, self.taxable, self.barcode, self.quantity))
 		self.conn.commit()		
 		
 

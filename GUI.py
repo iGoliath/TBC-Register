@@ -23,7 +23,7 @@ def enter_admin_frame():
 
 def enter_register_frame():
 	show_frame(register_frame)
-	usr_entry.focus_force()
+	invisible_entry.focus_set()
 
 	
 def enter_add_item_frame():
@@ -36,8 +36,10 @@ def enter_add_item_frame():
 		
 
 def process_sale(event=None):
-	barcode = usr_entry.get()
 	usr_entry.delete(0, tk.END)
+	usr_entry.insert(tk.END, "$0.00")
+	barcode = invisible_entry.get()
+	invisible_entry.delete(0, tk.END)
 	total, item_name, item_price, taxable = trans.sell_item(barcode)
 	total_entry.delete(0, tk.END)
 	total_entry.insert(0, total)
@@ -46,6 +48,22 @@ def process_sale(event=None):
 	
 def complete_sale(event=None):
 	trans.complete_transaction()
+	
+def number_pressed(event=None):
+	entry = invisible_entry.get()
+	length = len(entry)
+	if length == 1:
+		display_string = "$0.0" + str(entry)
+		usr_entry.delete(0, tk.END)
+		usr_entry.insert(tk.END, display_string)
+	elif length == 2:
+		display_string = "$0." + str(entry)
+		usr_entry.delete(0, tk.END)
+		usr_entry.insert(tk.END, display_string)
+	elif length >= 3:
+		display_string = "$" + entry[0:length-2] + "." + entry[length-2:length]
+		usr_entry.delete(0, tk.END)
+		usr_entry.insert(tk.END, display_string)
 
 def yes_button_logic():
 	global index
@@ -103,10 +121,8 @@ def reenter_button_pressed(which_button):
 		case "quantity":
 			index=4
 			add_item_label.config(text="Please enter the Quantity:")
-			
-			
-	
-	
+
+
 
 def on_add_item_enter(event=None):
 	item_info_entered = add_item_entry.get().strip()
@@ -245,11 +261,21 @@ admin_mode_button = tk.Button(mode_select_frame, text="Enter Admin Mode", font=(
 # Widgets for "Register Mode" ===>
 
 
-#Entry box where user can enter a barcode, or type 
-usr_entry = tk.Entry(register_frame, font=("Arial", 75), text="$0.00", bg="black", fg="#68FF00", justify="right", width=16)
-usr_entry.grid(column=0, row=0, sticky='ew', padx=2, columnspan=1)
-usr_entry.bind("<Return>", process_sale)
-usr_entry.bind("<Shift_R>", complete_sale)
+#Entry box where numbers user is typing are being displayed 
+usr_entry = tk.Entry(register_frame, font=("Arial", 75), bg="black", fg="#68FF00", justify="right", width=16)
+usr_entry.insert(tk.END, "$0.00")
+usr_entry.grid(column=0, row=0, sticky='ew', padx=2)
+#usr_entry.bind("<Return>", process_sale)
+#usr_entry.bind("<Shift_R>", complete_sale)
+
+'''Invisible entry where user input actually occurs. Allows user entry to be untampered so 
+same entry box can be used for barcodes and numberic values alike'''
+invisible_entry = tk.Entry(register_frame)
+invisible_entry.place(x=-100, y=-100)
+invisible_entry.bind("<Return>", process_sale)
+invisible_entry.bind("<Shift_R>", complete_sale)
+for i in range(10):
+	invisible_entry.bind(f"<KeyRelease-{i}>", number_pressed)
 
 # Quit Button
 register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())

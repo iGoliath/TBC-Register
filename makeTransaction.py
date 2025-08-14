@@ -58,7 +58,6 @@ class Transaction:
 		elif len(self.quantity_sold_list) >= 1:
 			for sublist in self.quantity_sold_list:
 				if sublist[0] == entered_barcode:
-					print("Updating: " + sublist[0])
 					sublist[1] += 1
 					break
 			else:

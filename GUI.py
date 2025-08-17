@@ -3,12 +3,38 @@ from makeTransaction import *
 from enteritem import *
 from time import sleep
 from datetime import datetime
+from escpos.printer import File
 
 trans = Transaction()
 date = datetime.today().strftime('%Y-%m-%d')
 add_item_object = AddToInventory()
 index = 0
 reentering = False
+printer = File("/dev/usb/lp0")
+
+
+root = tk.Tk()
+root.title("TBC REGISTER")
+root.geometry("1024x600")
+yes_no_var = tk.StringVar()
+
+mode_select_frame = tk.Frame(root)
+register_frame = tk.Frame(root, bg='black')
+admin_frame = tk.Frame(root)
+add_item_frame = tk.Frame(root)
+update_inventory_frame = tk.Frame(root)
+void_transaction_frame = tk.Frame(root)
+
+mode_select_frame.grid_columnconfigure(0, weight=1)
+mode_select_frame.grid_columnconfigure(1, weight=0)
+mode_select_frame.grid_columnconfigure(2, weight=1)
+
+
+#root.attributes("-fullscreen", True)
+
+
+for frame in (mode_select_frame, register_frame, admin_frame, add_item_frame, update_inventory_frame, void_transaction_frame):
+	frame.grid(row=0, column=0, sticky='nsew')
 
 
 def show_frame(frame):
@@ -35,6 +61,7 @@ def enter_void_frame(event=None):
 		
 
 def process_sale(event=None):
+	global printer
 	usr_entry.delete(0, tk.END)
 	usr_entry.insert(tk.END, "$0.00")
 	barcode = invisible_entry.get()
@@ -43,17 +70,46 @@ def process_sale(event=None):
 	total_entry.delete(0, tk.END)
 	total_entry.insert(0, f"{total:.2f}")
 	sale_info = item_name + "\t" + "$" + str(item_price) + " " + str(taxable) + "\n"
+	printer.text(sale_info)
 	sale_items.insert(tk.END, sale_info)
 	
 def void_transaction(which_button):
 	last_button.grid_forget()
 	number_button.grid_forget()
-	void_transaction_text.grid(row=0, column=1, sticky='nsew')
-	#if which_button == "last":
+	if which_button == "last":
+		void_transaction_text.grid(row=0, column=1, sticky='nsew')
+		void_conn = sqlite3.connect("test1")
+		void_cursor = void_conn.cursor()
+		void_cursor.execute('''SELECT * FROM SALES WHERE "Transaction ID" = (SELECT MAX("Transaction ID") FROM SALES)''')
+		results = void_cursor.fetchall()
+		row = results[0]
+		void_transaction_text.insert("end", "Transaction ID: " + str(row[0]) + " |\t")
+		void_transaction_text.insert("end", "Total: $" + f"{row[3]:.2f}" + "\n")
+		void_transaction_text.insert("end", "# Items Sold: " + str(row[4]) + " |\t")
+		void_transaction_text.insert("end", "Cash Used: $" + f"{row[6]:.2f}" + "\n")
+		void_transaction_text.insert("end", "CC Used: $" + f"{row[7]:.2f}" + " |\t")
+		void_transaction_text.insert("end", "Time: " + row[9])
+		void_yes_no.grid(column=1, row=1, sticky='nsew')
+		root.wait_variable(yes_no_var)
+		answer = yes_no_var.get()
+		if answer == "yes":
+			void_cursor.execute('''UPDATE SALES SET Voided = ? WHERE "Transaction ID" = ?''', (1, row[0]))
+			void_conn.commit()
+			void_conn.close()
+			
+		#elif answer == "no":
 		
-	#elif which_button == "elif":
+	#elif which_button == "ref":
+		
+		
 	
+
+def on_yes(event=None):
+	yes_no_var.set("yes")
 	
+def on_no(event=None):
+	yes_no_var.set("no")	
+		
 def on_cash(event=None):
 	global trans
 	balance = trans.total - trans.cash_used - trans.cc_used
@@ -74,6 +130,7 @@ def on_cash(event=None):
 			trans.cash_used += float("0." + amount_tendered)
 		elif length >= 3:
 			trans.cash_used += float(amount_tendered[0:length-2] + "." + amount_tendered[length-2:length])
+		balance = trans.total - trans.cash_used - trans.cc_used
 		if balance<=0:
 			display_string = "Change: $" + f"{abs(balance):.2f}"
 			usr_entry.delete(0, tk.END)
@@ -110,6 +167,7 @@ def on_cc(event=None):
 			trans.cc_used += float("0." + cc_amount)
 		elif length >= 3:
 			trans.cc_used += float(cc_used[0:length-2] + "." + cc_used[length-2:length])
+		balance = trans.total - trans.cash_used - trans.cc_used
 		if balance<=0:
 			display_string = "Change: $" + f"{abs(balance):.2f}"
 			usr_entry.delete(0, tk.END)
@@ -342,28 +400,7 @@ def on_add_item_enter(event=None):
 			add_item_entry.insert(tk.END, "ERROR")
 	
 
-root = tk.Tk()
-root.title("TBC REGISTER")
-root.geometry("1024x600")
 
-
-mode_select_frame = tk.Frame(root, width=1024, height=600)
-register_frame = tk.Frame(root, bg='black', width=1024, height=600)
-admin_frame = tk.Frame(root, width=1024, height=600)
-add_item_frame = tk.Frame(root, width=1024, height=600)
-update_inventory_frame = tk.Frame(root, width=1024, height=600)
-void_transaction_frame = tk.Frame(root, width=1024, height=500)
-
-mode_select_frame.grid_columnconfigure(0, weight=1)
-mode_select_frame.grid_columnconfigure(1, weight=0)
-mode_select_frame.grid_columnconfigure(2, weight=1)
-
-
-#root.attributes("-fullscreen", True)
-
-
-for frame in (mode_select_frame, register_frame, admin_frame, add_item_frame, update_inventory_frame, void_transaction_frame):
-	frame.grid(row=0, column=0, sticky='nsew')
 	
 
 # Widgets for "Mode select screen", aka screen user is meant to see upon "boot" ===>
@@ -376,6 +413,9 @@ admin_mode_button = tk.Button(mode_select_frame, text="Enter Admin Mode", font=(
 
 # Widgets for "Register Mode" ===>
 
+#register_frame.grid_columnconfigure(0, weight=1)
+#register_frame.grid_columnconfigure(1, weight=0)
+#register_frame.grid_columnconfigure(2, weight=1)
 
 #Entry box where numbers user is typing are being displayed 
 usr_entry = tk.Entry(register_frame, font=("Arial", 75), bg="black", fg="#68FF00", justify="right", width=16)
@@ -384,8 +424,8 @@ usr_entry.grid(column=0, row=0, sticky='ew', padx=2)
 #usr_entry.bind("<Return>", process_sale)
 #usr_entry.bind("<Shift_R>", complete_sale)
 
-'''Invisible entry where user input actually occurs. Allows user entry to be untampered so 
-same entry box can be used for barcodes and numberic values alike'''
+# Invisible entry where user input actually occurs. Allows user entry to be untampered so 
+# same entry box can be used for barcodes and numberic values alike
 invisible_entry = tk.Entry(register_frame)
 invisible_entry.place(x=-100, y=-100)
 invisible_entry.bind("<Return>", process_sale)
@@ -394,6 +434,9 @@ for i in range(10):
 invisible_entry.bind("<KeyRelease-Control_R>", on_cash)
 invisible_entry.bind("<KeyRelease-Control_L>", on_cc)
 invisible_entry.bind("<KeyRelease-v>", enter_void_frame)
+
+#register_widgets_frame = tk.Frame(register_frame)
+#register_widgets_frame.grid(column=1, row=0, sticky='nsew')
 
 # Quit Button
 register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())
@@ -511,15 +554,30 @@ void_transaction_frame.grid_columnconfigure(1, weight=0)
 void_transaction_frame.grid_columnconfigure(2, weight=1)
 
 
-last_button = tk.Button(void_transaction_frame, text="Void Last\nTransaction", font=("Arial", 85), command = lambda:void_transaction("last"))
-last_button.grid(row=0, column=1, sticky='nsew')
+void_label = tk.Label(void_transaction_frame, text="Select an Option", font=("Arial", 50))
+#void_label.grid(column = 1, row = 0, sticky='ew')
+last_button = tk.Button(void_transaction_frame, text="Void Last\nTransaction", font=("Arial", 70), command = lambda:void_transaction("last"))
+last_button.grid(row=1, column=1, sticky='nsew')
 
-number_button = tk.Button(void_transaction_frame, text="Void by\nReference #", font=("Arial", 85), command = lambda:void_transaction("ref"))
-number_button.grid(row=1, column=1, sticky='nsew')
+void_entry = tk.Entry(void_transaction_frame, font=("Arial", 50), justify="right")
 
-void_transaction_text = tk.Text(void_transaction_frame, height=7, font=("Arial", 40))
+number_button = tk.Button(void_transaction_frame, text="Void by\nReference #", font=("Arial", 70), command = lambda:void_transaction("ref"))
+number_button.grid(row=2, column=1, sticky='nsew')
 
-#confim_buttons_frame
+void_transaction_text = tk.Text(void_transaction_frame, width=30, height=3, font=("Arial", 40))
+
+void_yes_no = tk.Frame(void_transaction_frame)
+void_yes_no.grid_columnconfigure(0, weight=1)
+void_yes_no.grid_columnconfigure(1, weight=1)
+
+void_yes_button = tk.Button(void_yes_no, text="Yes", font=("Arial", 150), command= lambda: on_yes())
+
+void_no_button = tk.Button(void_yes_no, text="No", font=("Arial", 150), command=lambda: on_no())
+show_frame(mode_select_frame)
+
+void_yes_button.grid(column=0, row=0, sticky='nsew', padx=10)
+void_no_button.grid(column=1, row=0, sticky='nsew', padx=10)
+
 
 root.mainloop()
 

@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime
 
 date = datetime.today().strftime('%Y-%m-%d')
+time = datetime.now().strftime("%H:%M")
 
 class Transaction:
 	def __init__(self, sql_db="test1"):
@@ -22,7 +23,7 @@ class Transaction:
 		
 	def complete_transaction(self):
 		global date
-		self.c.execute("INSERT INTO SALES VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)", (self.subtotal, self.tax, self.total, self.items_sold, date, 0, self.cash_used, self.cc_used))
+		self.c.execute("INSERT INTO SALES VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.subtotal, self.tax, self.total, self.items_sold, date, self.cash_used, self.cc_used, 0, time))
 		self.c.execute('''SELECT MAX("Transaction ID") FROM Sales''')
 		results = self.c.fetchall()
 		row = results[0]

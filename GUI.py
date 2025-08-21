@@ -7,6 +7,7 @@ from escpos.printer import File
 
 trans = Transaction()
 date = datetime.today().strftime('%Y-%m-%d')
+time = datetime.now().strftime("%H:%M")
 add_item_object = AddToInventory()
 index = 0
 reentering = False
@@ -17,6 +18,9 @@ root = tk.Tk()
 root.title("TBC REGISTER")
 root.geometry("1024x600")
 yes_no_var = tk.StringVar()
+
+root.grid_columnconfigure(0, weight=1)
+root.grid_rowconfigure(0, weight=1)
 
 mode_select_frame = tk.Frame(root)
 register_frame = tk.Frame(root, bg='black')
@@ -30,12 +34,13 @@ mode_select_frame.grid_columnconfigure(1, weight=0)
 mode_select_frame.grid_columnconfigure(2, weight=1)
 
 
-#root.attributes("-fullscreen", True)
+
 
 
 for frame in (mode_select_frame, register_frame, admin_frame, add_item_frame, update_inventory_frame, void_transaction_frame):
 	frame.grid(row=0, column=0, sticky='nsew')
 
+#root.attributes("-fullscreen", True)
 
 def show_frame(frame):
 	frame.tkraise()
@@ -61,7 +66,6 @@ def enter_void_frame(event=None):
 		
 
 def process_sale(event=None):
-	global printer
 	usr_entry.delete(0, tk.END)
 	usr_entry.insert(tk.END, "$0.00")
 	barcode = invisible_entry.get()
@@ -70,35 +74,88 @@ def process_sale(event=None):
 	total_entry.delete(0, tk.END)
 	total_entry.insert(0, f"{total:.2f}")
 	sale_info = item_name + "\t" + "$" + str(item_price) + " " + str(taxable) + "\n"
-	printer.text(sale_info)
+	if len(trans.items_list) == 0:
+		printer.textln("--------------Sale--------------")
+		printer.textln(date + (" " * 17) + time)
+		printer.textln("")
+	printer.textln(item_name)
+	if taxable == 1:
+		printer.text("TX $")
+	else:
+		printer.text("NT $")
+	printer.textln(f"{item_price:.2f}")
 	sale_items.insert(tk.END, sale_info)
 	
 def void_transaction(which_button):
 	last_button.grid_forget()
 	number_button.grid_forget()
 	if which_button == "last":
-		void_transaction_text.grid(row=0, column=1, sticky='nsew')
+		void_transaction_text.grid(row=1, column=1, sticky='nsew')
 		void_conn = sqlite3.connect("test1")
 		void_cursor = void_conn.cursor()
 		void_cursor.execute('''SELECT * FROM SALES WHERE "Transaction ID" = (SELECT MAX("Transaction ID") FROM SALES)''')
 		results = void_cursor.fetchall()
 		row = results[0]
+		void_transaction_text.delete("1.0", "end")
 		void_transaction_text.insert("end", "Transaction ID: " + str(row[0]) + " |\t")
 		void_transaction_text.insert("end", "Total: $" + f"{row[3]:.2f}" + "\n")
 		void_transaction_text.insert("end", "# Items Sold: " + str(row[4]) + " |\t")
 		void_transaction_text.insert("end", "Cash Used: $" + f"{row[6]:.2f}" + "\n")
 		void_transaction_text.insert("end", "CC Used: $" + f"{row[7]:.2f}" + " |\t")
 		void_transaction_text.insert("end", "Time: " + row[9])
-		void_yes_no.grid(column=1, row=1, sticky='nsew')
+		void_yes_no.grid(column=1, row=2, sticky='nsew')
+		void_label.config(text="Void This Transaction?")
 		root.wait_variable(yes_no_var)
 		answer = yes_no_var.get()
 		if answer == "yes":
-			void_cursor.execute('''UPDATE SALES SET Voided = ? WHERE "Transaction ID" = ?''', (1, row[0]))
-			void_conn.commit()
-			void_conn.close()
+			try:
+				void_cursor.execute('''UPDATE SALES SET Voided = ? WHERE "Transaction ID" = ?''', (1, row[0]))
+				void_cursor.execute('''SELECT * FROM SALEITEMS WHERE "Transaction ID" = ?''', (row[0], ))
+				item_results = void_cursor.fetchall()
+				printer.textln("--------Void Transaction--------")
+				printer.textln("")
+				spaces = 16 - len(str((row[0])))
+				printer.textln("Transaction ID: " + (" " * spaces) + str(row[0]))
+				spaces = 17
+				printer.textln(date + (" " * spaces) + time)
+				printer.textln("")
+				for i in range(len(item_results)):
+					printer.textln(item_results[i][1])
+					if item_results[i][3] == 1:
+						printer.text("TX ")
+					else:
+						printer.text("NT ")
+					printer.textln(f"{item_results[i][2]:.2f}" + " QTY " + str(item_results[i][5]))
+				
+				printer.textln("")
+				if row[2] != 0:
+					printer.textln("")
+					rounded = f"{row[1]:.2f}"
+					spaces = 21 - len(rounded)
+					printer.textln("Subtotal: " + (" " * spaces) + "$" + rounded)
+					rounded = f"{row[2]:.2f}"
+					spaces = 26 - len(rounded)
+					printer.textln("Tax: " + (" " * spaces) + "$" + rounded)
+				rounded = f"{row[3]:.2f}"
+				spaces = 24 - len(rounded)
+				printer.textln("Total: " + (" " * spaces) + "$" + rounded)
+				printer.text("\n\n\n\n\n")
+				printer.cut(mode='PART', feed=True)
+				void_conn.commit()
+				void_conn.close()
+				void_transaction_text.grid_forget()
+				void_yes_no.grid_forget()
+			except sqlite3.Error as e:
+				void_transaction_text.delete("1.0", "end")
+				void_transaction_text.insert("end", "ERROR, please try again")
+			finally:
+				enter_register_frame()
+				void_label.config(text="Please select an option")
+				last_button.grid(row=1, column=1, sticky='nsew')
+				number_button.grid(row=2, column=1, sticky='nsew')
+		elif answer == "no":
+			void_label.config(text="Please Enter the Transaction ID:")
 			
-		#elif answer == "no":
-		
 	#elif which_button == "ref":
 		
 		
@@ -118,7 +175,7 @@ def on_cash(event=None):
 	length = len(amount_tendered)
 	if amount_tendered == "":
 		trans.cash_used = balance
-		display_string = "Change: \t$0.00"
+		display_string = "Chng: $0.00"
 		usr_entry.delete(0, tk.END)
 		usr_entry.insert(tk.END, display_string)
 		complete_sale()
@@ -132,16 +189,16 @@ def on_cash(event=None):
 			trans.cash_used += float(amount_tendered[0:length-2] + "." + amount_tendered[length-2:length])
 		balance = trans.total - trans.cash_used - trans.cc_used
 		if balance<=0:
-			display_string = "Change: $" + f"{abs(balance):.2f}"
+			display_string = "Chng: $" + f"{abs(balance):.2f}"
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 			complete_sale()
 		elif balance>=0:
-			display_string = "Balance: $" + f"{abs(balance):.2f}" 
+			display_string = "Bal: $" + f"{abs(balance):.2f}" 
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 		elif balance==0:
-			display_string = "Change: $0.00"
+			display_string = "Chng: $0.00"
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 			complete_sale()
@@ -155,7 +212,7 @@ def on_cc(event=None):
 	
 	if cc_amount == "":
 		trans.cc_used = balance
-		display_string = "Change: \t$0.00"
+		display_string = "Chng: \t$0.00"
 		usr_entry.delete(0, tk.END)
 		usr_entry.insert(tk.END, display_string)
 		complete_sale()
@@ -169,16 +226,16 @@ def on_cc(event=None):
 			trans.cc_used += float(cc_used[0:length-2] + "." + cc_used[length-2:length])
 		balance = trans.total - trans.cash_used - trans.cc_used
 		if balance<=0:
-			display_string = "Change: $" + f"{abs(balance):.2f}"
+			display_string = "Chng: $" + f"{abs(balance):.2f}"
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 			complete_sale()
 		elif balance>=0:
-			display_string = "Balance: $" + f"{abs(balance):.2f}" 
+			display_string = "Bal: $" + f"{abs(balance):.2f}" 
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 		elif balance==0:
-			display_string = "Change: $0.00"
+			display_string = "Chng: $0.00"
 			usr_entry.delete(0, tk.END)
 			usr_entry.insert(tk.END, display_string)
 			complete_sale()
@@ -186,6 +243,20 @@ def on_cc(event=None):
 	
 def complete_sale(event=None):
 	global trans
+	printer.text("")
+	if trans.tax != 0:
+		printer.textln("")
+		rounded = f"{trans.subtotal:.2f}"
+		spaces = 21 - len(rounded)
+		printer.textln("Subtotal: " + (" " * spaces) + "$" + rounded)
+		rounded = f"{trans.tax:.2f}"
+		spaces = 26 - len(rounded)
+		printer.textln("Tax: " + (" " * spaces) + "$" + rounded)
+	rounded = f"{trans.total:.2f}"
+	spaces = 24 - len(rounded)
+	printer.textln("Total: " + (" " * spaces) + "$" + rounded)
+	printer.text("\n\n\n\n\n")
+	printer.cut(mode='PART', feed=True)
 	trans.complete_transaction()
 	sale_items.delete("1.0", "end")
 	total_entry.delete(0, tk.END)
@@ -413,14 +484,14 @@ admin_mode_button = tk.Button(mode_select_frame, text="Enter Admin Mode", font=(
 
 # Widgets for "Register Mode" ===>
 
-#register_frame.grid_columnconfigure(0, weight=1)
-#register_frame.grid_columnconfigure(1, weight=0)
-#register_frame.grid_columnconfigure(2, weight=1)
+register_frame.grid_columnconfigure(0, weight=1)
+register_frame.grid_columnconfigure(1, weight=0)
+register_frame.grid_columnconfigure(2, weight=1)
 
 #Entry box where numbers user is typing are being displayed 
-usr_entry = tk.Entry(register_frame, font=("Arial", 75), bg="black", fg="#68FF00", justify="right", width=16)
+usr_entry = tk.Entry(register_frame, font=("Arial", 125), bg="black", fg="#68FF00", justify="right", width=11)
 usr_entry.insert(tk.END, "$0.00")
-usr_entry.grid(column=0, row=0, sticky='ew', padx=2)
+usr_entry.grid(column=1, row=0, sticky='ew', padx=2)
 #usr_entry.bind("<Return>", process_sale)
 #usr_entry.bind("<Shift_R>", complete_sale)
 
@@ -439,16 +510,16 @@ invisible_entry.bind("<KeyRelease-v>", enter_void_frame)
 #register_widgets_frame.grid(column=1, row=0, sticky='nsew')
 
 # Quit Button
-register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())
-register_quit_button.grid(column=0, row=1, sticky='e')
+#register_quit_button = tk.Button(register_frame, text="Quit", command=lambda: root.destroy())
+#register_quit_button.grid(column=1, row=1, sticky='e')
 
 # Box where program outputs current running total
 total_entry = tk.Entry(register_frame, font=("Arial", 35))
-total_entry.grid(column = 0, row = 2, sticky='nw')
+total_entry.grid(column = 1, row = 2, sticky='nw')
 
 #Log of what is being sold 
 sale_items = tk.Text(register_frame, width=75, font=("Arial", 12))
-sale_items.grid(column = 0, row = 2, sticky='e')
+sale_items.grid(column = 1, row = 2, sticky='e')
 
 
 # Widgets for "Admin Mode" ===>
@@ -555,7 +626,7 @@ void_transaction_frame.grid_columnconfigure(2, weight=1)
 
 
 void_label = tk.Label(void_transaction_frame, text="Select an Option", font=("Arial", 50))
-#void_label.grid(column = 1, row = 0, sticky='ew')
+void_label.grid(column = 1, row = 0, sticky='ew')
 last_button = tk.Button(void_transaction_frame, text="Void Last\nTransaction", font=("Arial", 70), command = lambda:void_transaction("last"))
 last_button.grid(row=1, column=1, sticky='nsew')
 

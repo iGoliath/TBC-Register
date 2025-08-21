@@ -4,6 +4,7 @@ from enteritem import *
 from time import sleep
 from datetime import datetime
 from escpos.printer import File
+import pygame
 
 trans = Transaction()
 date = datetime.today().strftime('%Y-%m-%d')
@@ -12,6 +13,7 @@ add_item_object = AddToInventory()
 index = 0
 reentering = False
 printer = File("/dev/usb/lp0")
+pygame.mixer.init()
 
 
 root = tk.Tk()
@@ -264,6 +266,8 @@ def complete_sale(event=None):
 	trans = Transaction()
 	
 def number_pressed(event=None):
+	pygame.mixer.music.load("short-beep.mp3")
+	pygame.mixer.music.play()
 	entry = invisible_entry.get()
 	length = len(entry)
 	if length == 1:

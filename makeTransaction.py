@@ -29,6 +29,8 @@ class Transaction:
 		row = results[0]
 		for i in range(len(self.items_list)):
 			self.c.execute("INSERT OR IGNORE INTO SALEITEMS VALUES(?, ?, ?, ?, ?, ?)", (row[0], self.items_list[i][0], self.items_list[i][1], self.items_list[i][2], self.items_list[i][3], self.quantity_sold_list[i][1]))
+			self.c.execute("UPDATE INVENTORY2 SET Quantity = Quantity - ? WHERE barcode = ?", (self.quantity_sold_list[i][1], self.quantity_sold_list[i][0]))
+		
 			
 
 	def sell_item(self, entered_barcode):

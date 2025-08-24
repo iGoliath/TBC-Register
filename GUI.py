@@ -12,7 +12,7 @@ time = datetime.now().strftime("%H:%M")
 add_item_object = AddToInventory()
 index = 0
 reentering = False
-printer = printer = Usb(0x1FC9, 0x2016, 0)#File("/dev/usb/lp0")
+printer = printer = Usb(0x0fe6, 0x811e, 0) #File("/dev/usb/lp0")
 pygame.mixer.init()
 
 
@@ -279,6 +279,7 @@ def cancel_trans(event=None):
 
 def complete_sale(event=None):
 	global trans
+	printer.cashdraw(pin=2)
 	trans.complete_transaction()
 	sale_conn = sqlite3.connect("test1")
 	sale_cursor = sale_conn.cursor()
@@ -287,6 +288,7 @@ def complete_sale(event=None):
 	sale_info = results[0]
 	sale_cursor.execute('''SELECT * FROM SALEITEMS WHERE "Transaction ID" = ?''', (sale_info[0], ))
 	sale_items_list = sale_cursor.fetchall()
+	sale_conn.close()
 	print_receipt("sale", sale_info[0], sale_items_list, sale_info)
 	sale_items.delete("1.0", "end")
 	total_entry.delete(0, tk.END)
@@ -350,8 +352,19 @@ def yes_no_button_logic(true_false, button_selected):
 def update_inventory(which_button):
 	print(which_button)
 	
+def no_sale(event=None):
+	invisible_entry.delete(0, tk.END)
+	printer.cashdraw(pin=2)
+	printer.textln("-------------- NS --------------")
+	printer.textln(date + (" " * 17) + time)
+	printer.ln(2)
+	printer.cut()
+
+	
+
 def go_back():
 	global index
+	# LOgic for back button during adding an item
 	# If you're not on the first page, go back one
 	# If index is 0, it should stay as such
 	if index!=0:
@@ -513,6 +526,46 @@ def on_add_item_enter(event=None):
 			add_item_entry.delete(0, tk.END)
 			add_item_entry.insert(tk.END, "ERROR")
 	
+def run_x(event=None):
+	x_conn = sqlite3.connect("test1")
+	x_cursor = x_conn.cursor()
+	printer.textln("--------------------------------")
+	printer.textln("--------- Daily Report ---------")
+	printer.textln("---------- " + date + " ----------")
+	printer.textln("--------------------------------")
+	printer.ln(2)
+
+	#for category in ("Cash", "CC", "TA1", "Tax"):
+	#	x_cursor.execute('''SELECT SUM({category}) FROM SALES WHERE Date = ?''', (date, ))
+	#	results = x_cursor.fetchall()
+	#	cash_used = results[0]
+	#	rounded =
+	x_cursor.execute('''SELECT SUM("Cash Used") FROM SALES WHERE Date = ?''', (date, ))
+	results = x_cursor.fetchall()
+	cash_used = results[0]
+	spaces = 15 - len(f"{cash_used[0]:.2f}")
+	printer.textln("Cash Collected: " + (" " * spaces) + "$" + f"{cash_used[0]:.2f}")
+	printer.ln(1)
+	x_cursor.execute('''SELECT SUM("CC Used") FROM SALES WHERE Date = ?''', (date, ))
+	results = x_cursor.fetchall()
+	cc_used = results[0]
+	spaces = 17 - len(f"{cc_used[0]:.2f}")
+	printer.textln("CC Collected: " + (" " * spaces) + "$" + f"{cc_used[0]:.2f}")
+	printer.ln(1)
+	x_cursor.execute('''SELECT SUM("Subtotal") FROM SALES WHERE Date = ?''', (date, ))
+	results = x_cursor.fetchall()
+	TA = results[0]
+	spaces = 17 - len(f"{TA[0]:.2f}")
+	printer.textln("TA Collected: " + (" " * spaces) + "$" + f"{TA[0]:.2f}")
+	printer.ln(1)
+	x_cursor.execute('''SELECT SUM("Tax") FROM SALES WHERE Date = ?''', (date, ))
+	results = x_cursor.fetchall()
+	Tax = results[0]
+	spaces = 16 - len(f"{Tax[0]:.2f}")
+	printer.textln("Tax Collected: " + (" " * spaces) + "$" + f"{Tax[0]:.2f}")
+	printer.cut()
+
+
 
 # =============================
 # Widgets for Mode select frame
@@ -547,6 +600,7 @@ invisible_entry.bind("<KeyRelease-KP_Add>", lambda event: on_cash_cc(event, "cc"
 invisible_entry.bind("<KeyRelease-KP_Multiply>", enter_void_frame)
 #invisible_entry.bind("<KeyRelease-KP_Delete>", go_home)
 invisible_entry.bind("<KeyRelease-KP_Divide>", cancel_trans)
+invisible_entry.bind("<KeyRelease-KP_Subtract>", no_sale)
 
 #register_widgets_frame = tk.Frame(register_frame)
 #register_widgets_frame.grid(column=1, row=0, sticky='nsew')
@@ -565,7 +619,7 @@ sale_items.grid(column = 1, row = 2, sticky='e')
 new_item_button = tk.Button(admin_frame, text = "Add New Item", font=("Arial", 50), height = 5, command = lambda: enter_add_item_frame()) 
 new_item_button.grid(column = 0, row = 1, sticky='s', padx = 5, pady = 5, ipadx=10, ipady=10)
 
-update_quantity_button = tk.Button(admin_frame, text = "Update Item \nQuantity", font=("Arial", 50), height = 5, command = lambda: show_frame(update_inventory_frame))
+update_quantity_button = tk.Button(admin_frame, text = "Update Item \nQuantity", font=("Arial", 50), height = 5, command = lambda: run_x())
 update_quantity_button.grid(column=1, row=1, sticky='e', padx=5, pady=5, ipadx=10, ipady=10)
 
 

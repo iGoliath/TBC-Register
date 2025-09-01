@@ -5,7 +5,7 @@ date = datetime.today().strftime('%Y-%m-%d')
 time = datetime.now().strftime("%H:%M")
 
 class Transaction:
-	def __init__(self, sql_db="test1"):
+	def __init__(self, sql_db="RegisterDatabase"):
 		self.conn_inventory = sqlite3.connect(sql_db)
 		self.c = self.conn_inventory.cursor()
 		self.subtotal = 0
@@ -29,13 +29,13 @@ class Transaction:
 		row = results[0]
 		for i in range(len(self.items_list)):
 			self.c.execute("INSERT OR IGNORE INTO SALEITEMS VALUES(?, ?, ?, ?, ?, ?)", (row[0], self.items_list[i][0], self.items_list[i][1], self.items_list[i][2], self.items_list[i][3], self.quantity_sold_list[i][1]))
-			self.c.execute("UPDATE INVENTORY2 SET Quantity = Quantity - ? WHERE barcode = ?", (self.quantity_sold_list[i][1], self.quantity_sold_list[i][0]))
+			self.c.execute("UPDATE INVENTORY SET Quantity = Quantity - ? WHERE barcode = ?", (self.quantity_sold_list[i][1], self.quantity_sold_list[i][0]))
 		
 			
 
 	def sell_item(self, entered_barcode):
 	
-		self.c.execute("SELECT * FROM INVENTORY2 WHERE BARCODE = ?", (entered_barcode,))
+		self.c.execute("SELECT * FROM INVENTORY WHERE BARCODE = ?", (entered_barcode,))
 		results = self.c.fetchall()
 		row = results[0]
 		#Row[1] = item_name, Row[2] = item_price, Row[3] = taxable, Row[5] = quantity

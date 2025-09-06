@@ -8,7 +8,8 @@ class Transaction:
 	def __init__(self, sql_db="RegisterDatabase"):
 		self.conn_inventory = sqlite3.connect(sql_db)
 		self.c = self.conn_inventory.cursor()
-		self.subtotal = 0
+		self.nontax = 0
+		self.pretax = 0
 		self.tax = 0
 		self.total = 0
 		self.items_sold = 0
@@ -23,13 +24,14 @@ class Transaction:
 		
 	def complete_transaction(self):
 		global date
-		self.c.execute("INSERT INTO SALES VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.subtotal, self.tax, self.total, self.items_sold, date, self.cash_used, self.cc_used, 0, time))
+		self.c.execute("INSERT INTO SALES VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.nontax, self.pretax, self.tax, self.total, self.items_sold, date, time, self.cash_used, self.cc_used, 0))
 		self.c.execute('''SELECT MAX("Transaction ID") FROM Sales''')
 		results = self.c.fetchall()
 		row = results[0]
 		for i in range(len(self.items_list)):
 			self.c.execute("INSERT OR IGNORE INTO SALEITEMS VALUES(?, ?, ?, ?, ?, ?)", (row[0], self.items_list[i][0], self.items_list[i][1], self.items_list[i][2], self.items_list[i][3], self.quantity_sold_list[i][1]))
 			self.c.execute("UPDATE INVENTORY SET Quantity = Quantity - ? WHERE barcode = ?", (self.quantity_sold_list[i][1], self.quantity_sold_list[i][0]))
+		self.conn_inventory.commit()
 		
 			
 
@@ -40,10 +42,12 @@ class Transaction:
 		row = results[0]
 		#Row[1] = item_name, Row[2] = item_price, Row[3] = taxable, Row[5] = quantity
 		item_info = [row[1], row[2], row[3], entered_barcode, row[5]]
-		self.subtotal += item_info[1]
 		if item_info[2] == 1:
 			self.tax += item_info[1] * 0.06625
-		self.total = round(self.subtotal + self.tax, 2)
+			self.pretax += item_info[1]
+		else:
+			self.nontax += item_info[1]
+		self.total = round(self.nontax + self.pretax + self.tax, 2)
 		
 		# If no items have been sold, start the list
 		# Otherwise, make sure item doesn't already exist within the list

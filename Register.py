@@ -11,14 +11,15 @@ time = datetime.now().strftime("%H:%M")
 add_item_object = AddToInventory()
 index = 0
 reentering = False
-#printer = Usb(0x0fe6, 0x811e, 0) #File("/dev/usb/lp0")
+coming_from_register = False
+printer = Usb(0x0fe6, 0x811e, 0) #File("/dev/usb/lp0")
 pygame.mixer.init()
 
 #Declaration of root window and all neccessary frames
 root = tk.Tk()
 root.title("TBC REGISTER")
 root.geometry("1024x600")
-root.tk.call('tk', 'scaling', 50)
+#root.tk.call('tk', 'scaling', 50)
 yes_no_var = tk.StringVar()
 reference_number_var = tk.StringVar()
 update_inventory_var = tk.StringVar()
@@ -36,22 +37,24 @@ void_yes_no = tk.Frame(void_transaction_frame)
 update_inventory_yes_no = tk.Frame(update_inventory_frame)
 register_widgets_frame = tk.Frame(register_frame)
 add_item_listbox_frame = tk.Frame(root)
+register_add_item_prompt_frame = tk.Frame(root)
 
 root.grid_columnconfigure(0, weight=1)
 root.grid_rowconfigure(0, weight=1)
 
 # Loop through frames, fit them to screen, and configure them so that widgets in column 1 are centered
 # Widgets in column 1 will determine the width of the rest of the widgets
-for frame in (mode_select_frame, register_frame, admin_frame, add_item_frame, update_inventory_frame, void_transaction_frame, add_item_listbox_frame):
+for frame in (mode_select_frame, register_frame, admin_frame, add_item_frame, update_inventory_frame, void_transaction_frame, add_item_listbox_frame, register_add_item_prompt_frame):
 	frame.grid(row=0, column=0, sticky='nsew')
 	frame.grid_columnconfigure(0, weight=1)
 	frame.grid_columnconfigure(1, weight=0)
 	frame.grid_columnconfigure(2, weight=1)
 
-for frame in (update_buttons_frame, reenter_frame, add_item_yes_no, void_yes_no, register_widgets_frame, add_item_listbox_frame):
+for frame in (update_buttons_frame, reenter_frame, add_item_yes_no, void_yes_no, register_widgets_frame):
 	frame.grid_columnconfigure(0, weight=1)
 	frame.grid_columnconfigure(1, weight=1)
 
+#add_item_listbox_frame.grid(row=0, column=0, sticky='nsew')
 #root.attributes("-fullscreen", True)
 
 def enter_admin_frame():
@@ -81,11 +84,23 @@ def register_go_back(event=None):
 	mode_select_frame.tkraise()		
 
 def process_sale(event=None):
+	global coming_from_register
 	total_entry.delete(0, tk.END)
 	total_entry.insert(tk.END, "$0.00")
 	barcode = invisible_entry.get()
 	invisible_entry.delete(0, tk.END)
 	total, item_name, item_price, taxable = trans.sell_item(barcode)
+	if total == "item_not_found":
+		register_add_item_prompt_frame.tkraise()
+		root.wait_variable(yes_no_var)
+		yes_no_answer = yes_no_var.get()
+		if yes_no_answer == "yes":
+			coming_from_register = True
+			enter_add_item_frame()
+			return
+		elif yes_no_answer == "no":
+			enter_register_frame()
+			return
 	usr_entry.delete(0, tk.END)
 	usr_entry.insert(0, "$" + f"{total:.2f}")
 	sale_items.delete("1.0", "end")
@@ -215,7 +230,7 @@ def print_receipt(receipt_type, transaction_id, items, sale_info):
 	spaces = 34 - len(rounded)
 	printer.textln("Total: " + (" " * spaces) + "$" + rounded)
 	printer.ln(2)
-	printer.cut()
+	#printer.cut()
 	
 
 def on_void_entry(event=None):
@@ -227,9 +242,14 @@ def on_cash_cc(event, payment_method):
 	pygame.mixer.music.load("short-beep.mp3")
 	pygame.mixer.music.play()
 	balance = trans.total - trans.cash_used - trans.cc_used 	# Calculate current balance remaining on the sale
-	entered_amount = invisible_entry.get().strip()	
+	if payment_method == "cc":
+		entered_amount = invisible_entry.get()
+		entered_amount = entered_amount[:-1]
+	elif payment_method == "cash":
+		entered_amount = invisible_entry.get().strip()	
 	invisible_entry.delete(0, tk.END)
 	length = len(entered_amount)
+	print(entered_amount)
 	if entered_amount == "":			# If user just pressed cash or credit card button, 
 		if payment_method == "cash":	# entire balance is being settled as such
 			trans.cash_used = balance
@@ -417,7 +437,7 @@ def no_sale(event=None):
 	printer.textln(("-" * 22) + " NS " + ("-" * 22))
 	printer.textln(date + (" " * 33) + time)
 	printer.ln(2)
-	printer.cut()
+	#printer.cut()
 
 	
 
@@ -475,8 +495,11 @@ def reenter_button_pressed(which_button):
 			add_item_entry.grid_forget()
 			add_item_button.grid_forget()
 			add_item_yes_no.grid(column=1, row=4, sticky='nsew')
-		case "quantity":
+		case "category":
 			index=4
+			add_item_listbox_frame.tkraise()
+		case "quantity":
+			index=5
 			add_item_label.config(text="Please enter the Quantity:")
 
 def on_add_item_enter(event=None):
@@ -485,6 +508,7 @@ def on_add_item_enter(event=None):
 	global index
 	global add_item_object
 	global reentering
+	global coming_from_register
 	
 	match index:
 		case 0:
@@ -550,19 +574,19 @@ def on_add_item_enter(event=None):
 			add_item_label_text = add_item_label.cget("text")
 			if not reentering:
 				add_item_object.quantity = item_info_entered
-			elif reentering and add_item_label_text == "Please enter the Quantity:":
+			elif reentering:
 				add_item_object.quantity = item_info_entered
 				reentering = False
 			else:
 				reentering = False
 			index+=1
 			add_item_label.config(text="Confirm item info is correct: ")
-			confirm_string = ("Name: " + add_item_object.name + "\nPrice: " + str(add_item_object.price) + " | \tBarcode: " + str(add_item_object.barcode) + "\nQuantity: " + str(add_item_object.quantity) + " | \tTaxable?: ")
+			confirm_string = ("Name: " + add_item_object.name + "\nPrice: " + str(add_item_object.price) + " | \tBarcode: " + str(add_item_object.barcode) + "\nQty: " + str(add_item_object.quantity) + " | Category: " + add_item_object.category + "\tTax?: ")
 			
 			if add_item_object.taxable == "1":
-				confirm_string += "Yes"
+				confirm_string += "Y"
 			else: 
-				confirm_string += "No"
+				confirm_string += "N"
 				
 			add_item_entry.grid_forget()
 			add_item_button.grid_forget()
@@ -573,7 +597,19 @@ def on_add_item_enter(event=None):
 			item_info_confirmation.insert(tk.END, confirm_string)
 			root.wait_variable(yes_no_var)
 			yes_no_answer = yes_no_var.get()
-			if yes_no_answer == "yes":
+			if yes_no_answer == "yes" and coming_from_register:
+				try:
+					add_item_object.commit_item()
+					print("Coming from register")
+				except sqlite3.Error as e:
+					print("Error entering item when coming from register")
+				finally:
+					index=0
+					add_item_yes_no.grid_forget()
+					item_info_confirmation.grid_forget()
+					add_item_entry.grid(row=1, column=1, sticky='ew', pady=15)
+					enter_register_frame()
+			elif yes_no_answer == "yes" and not coming_from_register:
 				try:
 					add_item_object.commit_item()
 					item_info_confirmation.delete("1.0", "end")
@@ -600,8 +636,10 @@ def on_add_item_enter(event=None):
 				add_item_yes_no.grid_forget()
 			elif yes_no_answer == "no":
 				index = 0
-				del add_item_object
+				#del add_item_object
 				admin_frame.tkraise()
+				add_item_yes_no.grid_forget()
+				add_item_entry.grid(row=1, column=1, sticky='ew', pady=15)
 		case _:
 
 			add_item_entry.delete(0, tk.END)
@@ -650,7 +688,7 @@ def run_x(event=None):
 	Tax = results[0]
 	spaces = 16 - len(f"{Tax[0]:.2f}")
 	printer.textln("Tax Collected: " + (" " * spaces) + "$" + f"{Tax[0]:.2f}")
-	printer.cut()
+	#printer.cut()
 
 
 
@@ -706,6 +744,20 @@ register_back_button.grid(column = 0, row = 1, sticky='nw')
 sale_items = tk.Text(register_widgets_frame, width=29, font=("Arial", 35), padx=10)
 sale_items.grid(column = 1, row = 0, sticky='e')
 
+register_add_item_prompt_label=tk.Label(register_add_item_prompt_frame, text="Item not found\nAdd it?", font=("Arial", 50))
+register_add_item_prompt_label.grid(row=0, column=1, sticky='ew')
+
+register_add_item_yes_no_frame=tk.Frame(register_add_item_prompt_frame)
+register_add_item_yes_no_frame.grid_columnconfigure(0, weight=1)
+register_add_item_yes_no_frame.grid_columnconfigure(1, weight=1)
+register_add_item_yes_no_frame.grid(row=1, column=1, sticky='nsew')
+
+register_add_item_yes_button=tk.Button(register_add_item_yes_no_frame, text="Yes", font=("Arial", 90), command = lambda: yes_no_var.set("yes"))
+register_add_item_yes_button.grid(row=0, column=0, sticky='nsew')
+
+register_add_item_no_button=tk.Button(register_add_item_yes_no_frame, text="No", font=("Arial", 90), command = lambda: yes_no_var.set("no"))
+register_add_item_no_button.grid(row=0, column=1, sticky='nsew')
+
 # ============================
 # Widgets for Admin Mode frame 
 # ============================
@@ -746,19 +798,22 @@ no_button = tk.Button(add_item_yes_no, text="No", font=("Arial", 150), command=l
 yes_button.grid(column=0, row=0, sticky='nsew', padx=10)
 no_button.grid(column=1, row=0, sticky='nsew', padx=10)
 
-add_item_listbox = tk.Listbox(add_item_listbox_frame)
-add_item_scrollbar = tk.Scrollbar(add_item_listbox_frame)
+#add_item_exit_button = tk.Button(add_item_frame, text="Exit", font=("Arial", 50))
 
-add_item_listbox.grid(row=1, column=0, sticky='nw')
-add_item_scrollbar.grid(row=1, column=1, sticky='ne')
+
+add_item_listbox = tk.Listbox(add_item_listbox_frame, width=20, height=5, font=("Arial", 50))
+add_item_scrollbar = tk.Scrollbar(add_item_listbox_frame, orient=tk.VERTICAL, width=40)
+
+add_item_listbox.grid(row=1, column=1, sticky='nw')
+add_item_scrollbar.grid(row=1, column=1, sticky='nse')
 
 add_item_scrollbar_label = tk.Label(add_item_listbox_frame, text="Please select category:", font=("Arial", 50))
-add_item_scrollbar_label.grid(column=0, row=0, sticky='nsew')
+add_item_scrollbar_label.grid(column=1, row=0, sticky='nsew')
 
 add_item_scrollbar_next = tk.Button(add_item_listbox_frame, text="Next", font=("Arial", 50), command=lambda: on_add_item_scrollbar_next())
 add_item_scrollbar_next.grid(row=2, column=1, sticky='nsew')
 
-for values in ("Fishing", "Pool", "Toys", "Clothes", "Camping", "RV", "Dry Goods", "Cookies/Chips", "Refrigerated", "Drinks", "Gifts", "Medicinal", "Toiletries", "Paper Products", "Kitchenware"):
+for values in ("Ice Cream", "Candy", "Propane", "Fishing", "Pool", "Toys", "Clothes", "Camping", "RV", "Dry Goods", "Cookies/Chips", "Refrigerated", "Drinks", "Gifts", "Medicinal", "Toiletries", "Paper Products", "Kitchenware"):
 	add_item_listbox.insert(tk.END, values)
 
 add_item_listbox.config(yscrollcommand= add_item_scrollbar.set)
@@ -781,7 +836,7 @@ add_taxable_button.grid(row=1, column=1, sticky='nsew')
 add_quantity_button = tk.Button(reenter_frame, text="Quantity", font=("Arial", 75), command = lambda: reenter_button_pressed("quantity"))
 add_quantity_button.grid(row=2, column=0, sticky='nsew')
 
-add_category_button = tk.Button(reenter_frame, text="Category", font=("Arial", 75), command = lambda: reetner_button_pressed("category"))
+add_category_button = tk.Button(reenter_frame, text="Category", font=("Arial", 75), command = lambda: reenter_button_pressed("category"))
 add_category_button.grid(row=2, column=1, sticky='nsew')
 
 # ==================================

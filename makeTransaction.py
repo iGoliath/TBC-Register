@@ -39,6 +39,8 @@ class Transaction:
 	
 		self.c.execute("SELECT * FROM INVENTORY WHERE BARCODE = ?", (entered_barcode,))
 		results = self.c.fetchall()
+		if not results:
+			return "item_not_found", None, None, None
 		row = results[0]
 		#Row[1] = item_name, Row[2] = item_price, Row[3] = taxable, Row[5] = quantity
 		item_info = [row[1], row[2], row[3], entered_barcode, row[5]]

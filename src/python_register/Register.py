@@ -1,29 +1,32 @@
-import tkinter as tk
+import os
 import sqlite3
+import threading
+import time
+import tkinter as tk
+from datetime import datetime, timedelta
+from tkinter import ttk
+
 from . import inventory_functions as invf
 from . import widget_functions as wf
-from .widget_manager import WidgetManager
-from .state_manager import StateManager
-from .printing_manager import Printer
 from .config import Config
-from datetime import datetime, timedelta
-import time
-import threading
-import os
+from .printing_manager import Printer
+from .state_manager import StateManager
+from .widget_manager import WidgetManager
+
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
-import pygame
 import subprocess
 import sys
-from pathlib import Path
 from decimal import *
+from pathlib import Path
+
+import pygame
+
 
 class Register:
 	def __init__(self, root, db_connection = None):
 		"""Initialize UI, StateManager, Config"""
 		self.config = Config()
 		self.state_manager = StateManager(root, self.config.data['database_name'], db_connection)
-		self.state_manager.browse_index.trace_add('write', self.browse_transactions)
-		self.state_manager.item_lookup_var.trace_add('write', self.on_item_lookup)
 		self.state_manager.sale_items_listbox_var.trace_add('write', self.on_sale_items_listbox_var)
 		self.state_manager.return_var.trace_add('write', self.finish_return)
 		self.ui = WidgetManager(root, self)
@@ -43,38 +46,18 @@ class Register:
 		self.number_pressed(self.ui.add_price_invisible_entry, self.ui.add_price_entry)
 		return "break"
 
-	def on_item_lookup(self, *args):
-
-		pattern = f'%{self.ui.lookup_items_entry.get()}%'
-		self.state_manager.cursor.execute("SELECT item_name FROM Inventory WHERE item_name LIKE ?", (pattern, ))
-		self.ui.lookup_items_listbox.delete(0, tk.END)
-		results = self.state_manager.cursor.fetchall()
-
-		for item in results:
-			self.ui.lookup_items_listbox.insert(tk.END, f'{item[0]}\n')
-
-
 	def enter_add_item_lookup(self):
-		self.ui.register_lookup_items_frame.tkraise()
-		self.ui.lookup_items_entry.focus_set()
+		self.ui.show_frame("lookup_items")
 		self.state_manager.looking_up_add_item = True
 	
-	def confirm_lookup_items(self):
-		index = self.ui.lookup_items_listbox.curselection()
-		name = self.ui.lookup_items_listbox.get(index).strip()
-		quantity = int(self.ui.lookup_items_quantity_spinbox.get())
-		self.state_manager.cursor.execute('''SELECT item_barcode FROM inventory WHERE item_name = ?''', (name, ))
-		barcode = self.state_manager.cursor.fetchall()[0][0]
-		
+	def handle_lookup_confirmed(self, barcode, quantity):
 		if self.state_manager.looking_up_add_item:
-			self.ui.barcode_var.set(barcode)
 			self.state_manager.looking_up_add_item = False
+			self.ui.barcode_var.set(barcode)
 			self.on_add_item_enter()
 		else:
-			for i in range(0, quantity):
-				self.process_sale(None, barcode)
-			self.ui.register_frame.tkraise()
-			self.ui.invisible_entry.focus_set()
+			self.process_sale(None, barcode, quantity)
+			self.ui.return_to_register()
 
 	def perform_backup(self):
 		time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -128,79 +111,6 @@ class Register:
 		else:
 			self.ui.add_item_label.config(text="Please enter item's barcode:")
 
-	def enter_browse_transactions_frame(self, *args):
-		'''Setup necessary information for browse transaction frame. If voiding,
-		set up those widgets as well. args[0] -> Flag for voiding or not, 
-		args[1] -> Flag for seasonal transaction or not''' 
-		if args[1] == 0:
-			self.state_manager.cursor.execute(
-				'''SELECT * FROM sales WHERE sale_id = (SELECT MAX(sale_id) FROM SALES)''')
-			results = self.state_manager.cursor.fetchone()
-			if not results:
-				self.ui.popup_description_label.config(text="No Transactions Yet!")
-				self.ui.popup_frame.tkraise()
-				return False
-			else:
-				self.state_manager.browse_index.set(results[0])
-				self.print_transaction_info(self.ui.browse_text, results)
-				self.ui.browse_label.config(text="Browsing Transactions")
-				if args[0] == 1:
-					self.ui.setup_void_widgets()
-				self.ui.browse_transactions_frame.tkraise()
-				return True
-		elif args[1] == 1:
-			self.state_manager.browsing_seasonals = True
-			self.state_manager.cursor.execute(
-				'''SELECT * FROM seasonals WHERE seasonal_id = (SELECT MAX(seasonal_id) FROM seasonals)''')
-			results = self.state_manager.cursor.fetchone()
-			if not results:
-				self.ui.browse_text.delete("1.0", "end")
-				self.ui.browse_text.insert("end",  "No Seasonals Yet...")
-			else:
-				self.state_manager.browse_index.set(results[0])
-				self.ui.print_seasonal_info(results)
-
-			self.ui.setup_browse_seasonals()
-				
-
-	def browse_transactions(self, *args):
-		'''Called when state_manager.browse_index is written to. Move info to current index.'''
-		self.ui.browse_entry.delete(0, tk.END)
-		if not self.state_manager.browsing_seasonals:
-			self.state_manager.cursor.execute(
-				'''SELECT * FROM sales WHERE sale_id = ?''', (self.state_manager.browse_index.get(), )
-			)
-		else:
-			self.state_manager.cursor.execute(
-				'''SELECT * FROM seasonals WHERE seasonal_id = ?''', (self.state_manager.browse_index.get(), )
-			)
-		results = self.state_manager.cursor.fetchone()
-		if not results:
-			if self.state_manager.browse_index.get() == 0:
-				self.state_manager.browse_index.set(1)
-				return
-			else:
-				self.state_manager.browse_index.set(self.state_manager.browse_index.get() - 1)
-				return
-		
-		if not self.state_manager.browsing_seasonals:
-			self.print_transaction_info(self.ui.browse_text, list(results))
-		else:
-			self.ui.print_seasonal_info(results)
-
-	def browse_print_receipt(self):
-		self.state_manager.cursor.execute('''SELECT * FROM sales WHERE sale_id = ?''', (self.state_manager.browse_index.get(), ))
-		transaction_info = list(self.state_manager.cursor.fetchall()[0])
-		self.state_manager.cursor.execute('''SELECT * FROM sale_items WHERE sale_id = ?''', (self.state_manager.browse_index.get(), ))
-		item_results = self.state_manager.cursor.fetchall()
-		if transaction_info[10] == 1:
-			self.printer.print_receipt("void", item_results, transaction_info)
-		elif transaction_info[4] < 0:
-			self.printer.print_receipt("return", item_results, transaction_info)
-		else:
-			self.printer.print_receipt("sale", item_results, transaction_info)
-		self.ui.register_frame.tkraise()
-
 	def process_sale(self, event = None, entered_barcode=None, decimal_amount = Decimal('1')):
 		"""Check for existing barcode. If so, add item to running list of sold items
 		and display info to cashier. Else, prompt user to enter the item."""
@@ -237,39 +147,6 @@ class Register:
 		self.ui.sale_items_listbox.yview_moveto(1.0)
 		self.ui.update_entry(self.ui.user_entry, "$0.00")
 		
-	def void_transaction(self):
-
-		if not self.enter_browse_transactions_frame(1, 0):
-			return
-		
-		while True:
-			root.wait_variable(self.state_manager.void_var)
-			self.state_manager.cursor.execute('''SELECT is_voided FROM sales WHERE sale_id = ?''', (self.state_manager.browse_index.get(), ))
-			voided = (self.state_manager.cursor.fetchall()[0])[0]
-			if voided == 1:
-				self.ui.popup_description_label.config(text="This transaction is already voided!")
-				self.ui.popup_frame.tkraise()
-				continue
-			else:
-				break
-
-		try:
-			self.state_manager.cursor.execute('''UPDATE sales SET is_voided = ? WHERE sale_id = ?''', (1, self.state_manager.browse_index.get()))
-			self.state_manager.cursor.execute('''SELECT * FROM sales WHERE sale_id = ?''', (self.state_manager.browse_index.get(), ))
-			transaction_info = list(self.state_manager.cursor.fetchall()[0])
-			self.state_manager.cursor.execute('''SELECT * FROM sale_items WHERE sale_id = ?''', (self.state_manager.browse_index.get(), ))
-			item_results = self.state_manager.cursor.fetchall()
-			for i in range(len(item_results)):
-				current_quantity = self.state_manager.cursor.execute("SELECT item_quantity FROM inventory WHERE item_barcode = ?", (item_results[i][4], )).fetchall()[0]
-				self.state_manager.cursor.execute('''UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?''', (current_quantity + item_results[i][5], item_results[i][4]))
-		except sqlite3.Error as e:
-			self.ui.popup_description_label.config(text=f"{e}")
-			self.ui.popup_frame.tkraise()
-		finally:
-			self.state_manager.conn.commit()
-			self.printer.print_receipt("void", item_results, transaction_info)
-			self.ui.remove_void_widgets()
-			self.enter_register_frame()
 
 	def print_transaction_info(
 			self, text_widget, transaction_info):
@@ -288,7 +165,7 @@ class Register:
 	def on_cash(self, event = None):
 		"""Handles when cashier attempts to finalize transaction using cash."""
 		if self.state_manager.trans.total == 0:
-			self.ui.popup_description_label.config(text="No Items Entered!")
+			self.ui.popup_description_label_var.set("No Items Entered!")
 			self.ui.popup_frame.tkraise()
 			self.clear()
 			return "break"
@@ -344,7 +221,7 @@ class Register:
 	def on_cc(self, event = None):
 		"""Handles when cashier attempts to finalize transaction with cc."""
 		if self.state_manager.trans.total == 0:
-			self.ui.popup_description_label.config(text="No Items Entered!")
+			self.ui.popup_description_label_var.set("No Items Entered!")
 			self.ui.popup_frame.tkraise()
 			self.clear()
 			return "break"
@@ -515,18 +392,7 @@ class Register:
 	def process_sale_multiples(self, event=None):
 		self.remove_items_from_sale(self.state_manager.sale_items_listbox_var.get(), False)
 		self.state_manager.trans.items_list[self.state_manager.sale_items_listbox_var.get()][-2] = 0
-		if Decimal(self.ui.invisible_entry_var.get()) % 1 == 0:
-			for i in range(0, int(self.ui.invisible_entry_var.get())):
-				self.process_sale(None, self.state_manager.trans.items_list[self.state_manager.sale_items_listbox_var.get()][3])
-		else:
-			for i in range(0, int(Decimal(self.ui.invisible_entry_var.get()))):
-				self.process_sale(None, self.state_manager.trans.items_list[self.state_manager.sale_items_listbox_var.get()][3])
-			index = self.ui.invisible_entry_var.get().find('.')
-			decimal_amount = self.ui.invisible_entry_var.get()[index:]
-			self.process_sale(
-				None,
-				self.state_manager.trans.items_list[self.state_manager.sale_items_listbox_var.get()][3],
-				decimal_amount)
+		self.process_sale(None, self.state_manager.trans.items_list[self.state_manager.sale_items_listbox_var.get()][3], Decimal(self.ui.invisible_entry_var.get()))
 		self.ui.invisible_entry.delete(0, tk.END)
 		self.ui.update_entry(self.ui.user_entry, "$0.00")
 		self.state_manager.sale_items_listbox_var.set(-1)	
@@ -550,7 +416,7 @@ class Register:
 	def make_seasonal_sale(self):
 			
 		if self.state_manager.trans.total == 0:
-			self.ui.popup_description_label.config(text="No Items Entered!")
+			self.ui.popup_description_label_var.set("No Items Entered!")
 			self.ui.popup_frame.tkraise()
 			return
 			
@@ -563,7 +429,7 @@ class Register:
 			if results:
 				break
 			else:
-				self.ui.popup_description_label.config(text = "Invalid Seasonal ID\nPlease try Again")
+				self.ui.popup_description_label_var.set("Invalid Seasonal ID\nPlease try Again")
 				self.ui.popup_frame.tkraise()
 		self.ui.seasonal_id_entry_frame.lower()
 		self.state_manager.trans.complete_transaction(self.state_manager.seasonal_id_var.get())
@@ -770,7 +636,7 @@ class Register:
 	def run_z(self, event=None):
 		tomorrow = (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')
 		self.ui.popup_label.config(text="NOTE:")
-		self.ui.popup_description_label.config(text=f"You are about to run a 'Z'\nThis will reset the beginning date to:\n{tomorrow}")
+		self.ui.popup_description_label_var.set(f"You are about to run a 'Z'\nThis will reset the beginning date to:\n{tomorrow}")
 		self.ui.setup_popup_back_confirm()
 		self.ui.popup_frame.tkraise()
 		root.wait_variable(self.state_manager.popup_var)
@@ -813,10 +679,10 @@ class Register:
 		self.state_manager.trans.complete_transaction()
 		self.state_manager.cursor.execute('''SELECT * FROM sales WHERE sale_id = (SELECT MAX(sale_id) FROM SALES)''')
 		results = self.state_manager.cursor.fetchall()
-		row = list(results[0])
+		row = results[0]
 		self.state_manager.cursor.execute('''SELECT * FROM sale_items WHERE sale_id = ?''', (row[0], ))
-		item_results = list(self.state_manager.cursor.fetchall())
-		self.printer.print_receipt("return", item_results, row)
+		item_results = self.state_manager.cursor.fetchall()
+		self.printer.print_receipt("return", item_results, dict(row))
 		self.ui.bind_invisible_entry_keys()
 		self.enter_register_frame()
 
@@ -852,6 +718,9 @@ if __name__ == "__main__":
 
 	#Declaration of root window
 	root = tk.Tk()
+	style = ttk.Style(root)
+	style.theme_use('clam')
+	style.configure('DateEntry', arrowsize=50)
 	root.title("TBC REGISTER")
 	root.geometry("1024x600")
 	#root.tk.call('tk', 'scaling', 1)
@@ -866,7 +735,7 @@ if __name__ == "__main__":
 	getcontext().rounding = 'ROUND_HALF_UP'
 	
 
-	backup_thread = threading.Thread(
+	'''backup_thread = threading.Thread(
 		target = register.backup_scheduler,
 		daemon=True
 	)
@@ -874,7 +743,7 @@ if __name__ == "__main__":
 
 	register.remove_old_backups(register.config.data['backup_removal_cutoff'])
 	
-	register.perform_backup()
+	register.perform_backup()'''
 
 	pygame.mixer.init()
 	register.enter_register_frame()
@@ -885,8 +754,8 @@ if __name__ == "__main__":
 		if results.returncode == 0:
 			subprocess.run(['sudo', 'timedatectl', 'set-ntp', 'true'])
 		else:
-			register.ui.popup_description_label.config(
-				text="Internet connection could not be reached.\nPlease check your network connection."
+			register.ui.popup_description_label_var.set(
+				"Internet connection could not be reached.\nPlease check your network connection."
 			)
 			register.ui.popup_frame.tkraise()
 	elif not register.check_time_synced():

@@ -16,31 +16,32 @@ class Transaction:
 		
 		
 	def complete_transaction(self, coupon_info = None):
-		self.db_cursor.execute("INSERT INTO sales VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			(self.nontax, self.pretax, self.tax, self.total, Dec4(self.items_sold), datetime.today().strftime('%Y-%m-%d'),
-			datetime.now().strftime("%H:%M"), self.cash_used, self.cc_used, 0))
-		self.db_cursor.execute('''SELECT MAX(sale_id) FROM sales''')
-		max_sale_id = (self.db_cursor.fetchall()[0])[0]
-		for item in self.items_list:
-			self.db_cursor.execute("INSERT OR IGNORE INTO sale_items VALUES(?, ?, ?, ?)",
-				(max_sale_id, item[1], Dec4(item[4]), item[5]))
-			self.db_cursor.execute("SELECT item_quantity FROM inventory WHERE item_barcode = ?", (item[3],))
-			current_quantity = self.db_cursor.fetchall()[0][0]
-			if not self.returning:
-				self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
-					(Dec4(current_quantity - item[4]), item[3]))
-			else:
-				self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
-					(Dec4(current_quantity + item[4]), item[3]))
-		
+		try:
+			self.db_cursor.execute("INSERT INTO sales VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				(self.nontax, self.pretax, self.tax, self.total, Dec4(self.items_sold), datetime.today().strftime('%Y-%m-%d'),
+				datetime.now().strftime("%H:%M"), self.cash_used, self.cc_used, 0))
+			self.db_cursor.execute('''SELECT MAX(sale_id) FROM sales''')
+			max_sale_id = (self.db_cursor.fetchall()[0])[0]
+			for item in self.items_list:
+				self.db_cursor.execute("INSERT OR IGNORE INTO sale_items VALUES(?, ?, ?, ?)",
+					(max_sale_id, item[1], Dec4(item[4]), item[5]))
+				self.db_cursor.execute("SELECT item_quantity FROM inventory WHERE item_barcode = ?", (item[3],))
+				current_quantity = self.db_cursor.fetchall()[0][0]
+				if not self.returning:
+					self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
+						(Dec4(current_quantity - item[4]), item[3]))
+				else:
+					self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
+						(Dec4(current_quantity + item[4]), item[3]))
+			self.db_conn.commit()
+		except sqlite3.Error as e:
+			print(f"Error when completing transaction: {e}")
+			self.db_conn.rollback()
 		#if seasonal_id is not None:
 			#self.db_cursor.execute('''INSERT INTO seasonal_sales VALUES (NULL, ?, ?)''', (seasonal_id, max_sale_id))
 
 		if coupon_info:
 			self.db_cursor.execute("INSERT INTO coupons VALUES (NULL, ?, ?, ?)", (max_sale_id, coupon_info[0], coupon_info[1]))
-
-
-		self.db_conn.commit()
 
 	def complete_as_decrement(self):
 		global datetime
@@ -55,12 +56,11 @@ class Transaction:
 				current_quantity = self.db_cursor.fetchall()[0][0]
 				self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
 					(Dec4(current_quantity - item[4]), item[3]))
+			self.db_conn.commit()
 		except sqlite3.IntegrityError as e:
 			print(e)
 			self.db_conn.rollback()
-		finally:
-			self.db_conn.commit()
-
+	
 		
 	def update_seasonal_info(self, seasonal_id):
 
@@ -81,16 +81,13 @@ class Transaction:
 			self.nontax += Decimal(results[1]) * Decimal(decimal_amount)
 		self.total = self.nontax + self.pretax + self.tax
 		if not any(entered_barcode in sublist for sublist in self.items_list):
-			self.items_list.append([results[0], Decimal(results[1]), results[2], entered_barcode, Decimal('1.0'), results[3]])
-			quantity_sold = Decimal('1.0')
+			self.items_list.append([results[0], Decimal(results[1]), results[2], entered_barcode, decimal_amount, results[3]])
 		else:
 			for sublist in self.items_list:
 				if entered_barcode in sublist:
 					sublist[-2] += Decimal(decimal_amount)
-					quantity_sold = sublist[-2]
 					break
 
-		
 		self.items_sold += Decimal(decimal_amount)	
 				
 		return self.total, results[0], Decimal(results[1]) / Decimal(100), results[2]

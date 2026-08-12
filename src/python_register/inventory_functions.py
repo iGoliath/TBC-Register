@@ -5,9 +5,14 @@ import sqlite3
 from decimal import Decimal
 
 def update_barcode(state_manager: StateManager, barcode: str) -> None:
-    state_manager.cursor.execute('''INSERT INTO updated_barcodes SELECT item_id, item_barcode, ? FROM inventory WHERE item_barcode = ?''', (barcode, barcode.lstrip('0')))
-    state_manager.cursor.execute('''UPDATE inventory SET item_barcode = ? WHERE item_barcode = ?''', (barcode, barcode.lstrip('0')))
-    state_manager.conn.commit()
+    try:
+        state_manager.cursor.execute('''INSERT INTO updated_barcodes SELECT item_id, item_barcode, ? FROM inventory WHERE item_barcode = ?''', (barcode, barcode.lstrip('0')))
+        state_manager.cursor.execute('''UPDATE inventory SET item_barcode = ? WHERE item_barcode = ?''', (barcode, barcode.lstrip('0')))
+        state_manager.conn.commit()
+    except sqlite3.Error as e:
+        print(f"Error when updating item's barcode. inventory_functions line 9/10. Error: {e}")
+        state_manager.conn.rollback()
+   
 def check_item_exists(state_manager: StateManager, barcode: str) -> bool:
     """This function is the pre-requisite to adding an item. We want to
     make sure that the item does not already exist."""

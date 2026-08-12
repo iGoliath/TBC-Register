@@ -23,9 +23,8 @@ class StateManager:
         self.yes_no_var = tk.StringVar(root_window)
         self.seasonal_id_var = tk.StringVar(root_window)
         self.return_var = tk.StringVar(root_window)
-        self.void_var = tk.StringVar(root_window)
-        self.item_lookup_var = tk.StringVar(root_window)
         self.browse_index = tk.IntVar(root_window)
+        self.browse_mode = tk.StringVar(root_window)
         self.popup_var = tk.StringVar(root_window)
         self.sale_items_listbox_var = tk.IntVar(root_window, -1)
         self.binding_manager = None
@@ -49,6 +48,30 @@ class StateManager:
     def new_add_item_object(self):
         del self.add_item_object
         self.add_item_object = AddToInventory(self.conn, self.cursor)
+
+    def grab_names_like(self, name):
+        return self.cursor.execute("SELECT item_name FROM inventory WHERE item_name LIKE ?", (f'%{name}%', )).fetchall()
+
+    def grab_barcode_given_name(self, name):
+        return self.cursor.execute('''SELECT item_barcode FROM inventory WHERE item_name = ?''', (name,)).fetchone()[0]
+
+    def check_voided(self, sale_id):
+        return self.cursor.execute('''SELECT is_voided FROM sales WHERE sale_id = ?''', (sale_id, )).fetchone()[0]
+
+    def set_voided(self, sale_id):
+        self.cursor.execute('''UPDATE sales SET is_voided = ? WHERE sale_id = ?''', (1, sale_id))
+
+    def get_sale_info(self, sale_id):
+        return self.cursor.execute('''SELECT * FROM sales WHERE sale_id = ?''', (sale_id, )).fetchall()
+
+    def get_sale_items(self, sale_id):
+        return self.cursor.execute('''SELECT * from sale_items WHERE sale_id = ?''', (sale_id, )).fetchall()
+
+    def get_item_quantity_id(self, id):
+        return self.cursor.execute('''SELECT item_quantity FROM inventory WHERE item_id = ?''', (id, )).fetchone()[0]
+
+    def update_quantity(self, quantity, id):
+        self.cursor.execute('''UPDATE inventory SET item_quantity = ? WHERE item_id = ?''', (Dec4(quantity), id))
 
 
    

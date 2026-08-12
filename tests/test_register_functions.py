@@ -141,7 +141,6 @@ def test_basic_sale_(register_instance, payment_method, cash_used, cc_used, db):
         'SELECT * FROM sales WHERE sale_id = (SELECT MAX(sale_id) FROM sales)'
         ).fetchone()
    
-    print(dict(row))
     assert row["cash_used"] == cash_used
     assert row["cc_used"] == cc_used
     assert row["is_voided"] == 0
@@ -386,9 +385,9 @@ def test_cancel_entire_single_item_sale(register_instance, item_name):
         "listbox_index,balance_entry,user_entry,nontax,pretax,tax," \
         "total,items_sold,listbox_first_item,listbox_second_item", [
             (1, "$1.23", "$0.00", Decimal('1.23'), Decimal('0'),
-            Decimal('0'), Decimal('1.23'), Decimal('1'), (), ('Test (1.0) $1.23 NT', )),
+            Decimal('0'), Decimal('1.23'), Decimal('1'), (), ('Test (1) $1.23 NT', )),
             (0, "$1.31", "$0.00", Decimal('0'), Decimal('1.23'),
-              Decimal('0.08'), Decimal('1.31'), Decimal('1'), (), ('Test1 (1.0) $1.23 TX', ))
+              Decimal('0.08'), Decimal('1.31'), Decimal('1'), (), ('Test1 (1) $1.23 TX', ))
         ])
 def test_cancel_single_item(
     register_instance, listbox_index, balance_entry, user_entry, nontax,

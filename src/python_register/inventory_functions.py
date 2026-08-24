@@ -20,8 +20,7 @@ def check_item_exists(state_manager: StateManager, barcode: str) -> bool:
     if (len(barcode.lstrip('0')) != (len(barcode))):
         update_barcode(state_manager, barcode)
     
-    state_manager.cursor.execute("SELECT * FROM inventory WHERE item_barcode = ?", (barcode,))
-    results = state_manager.cursor.fetchall()
+    results = state_manager.cursor.execute("SELECT * FROM inventory WHERE item_barcode = ?", (barcode,)).fetchall()
     if results:
         found_item_info = results[0]
         state_manager.add_item_object.name = found_item_info['item_name']
@@ -142,7 +141,7 @@ def enter_item_confirmation(
         elif state_manager.reentering:
             state_manager.reentering = False
         elif state_manager.reentering_quantity:
-            ui.add_quantity_label.config(text="Please enter item's quantity:")
+            ui.add_quantity_var.set("Please enter item's quantity:")
             state_manager.add_item_object.quantity = Decimal(quantity)
             state_manager.reentering_quantity = False
     

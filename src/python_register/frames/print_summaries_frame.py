@@ -1,7 +1,7 @@
 from tkcalendar import DateEntry
 import tkinter as tk
 from .base_frame import BaseFrame
-from datetime import date
+from datetime import datetime
 
 
 class PrintSummariesFrame(BaseFrame):
@@ -24,12 +24,12 @@ class PrintSummariesFrame(BaseFrame):
         #back_button = tk.Button(self, text="Back", command = lambda: )
 
     def on_show(self):
-        self.starting_date_entry.set_date(date.today())
-        self.ending_date_entry.set_date(date.today())
+        self.starting_date_entry.set_date(datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0))
+        self.ending_date_entry.set_date(datetime.today())
 
     def set_today(self):
-        self.starting_date_entry.set_date(date.today())
-        self.ending_date_entry.set_date(date.today())
+        self.starting_date_entry.set_date(datetime.today())
+        self.ending_date_entry.set_date(datetime.today())
 
     def on_confirm(self):
         self.controller.printer.run_x(self.starting_date_entry.get_date(), self.ending_date_entry.get_date())

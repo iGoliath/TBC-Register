@@ -153,7 +153,7 @@ class Register:
 			"""Print item info for transaction into a text widget. (Currently formatted for
 			4 height)."""
 			text_widget.delete("1.0", "end")
-			text_widget.insert("end", f"Transaction ID: {str(transaction_info[0])} |\t")
+			text_widget.insert("end", f"Trans ID: {str(transaction_info[0])} |\t")
 			text_widget.insert("end", f"Total: ${transaction_info[4]:.2f}\n")
 			text_widget.insert("end", f"Items Sold: {str(transaction_info[5])} |\t")
 			text_widget.insert("end", f"Cash: ${transaction_info[8]:.2f}\n")
@@ -484,7 +484,7 @@ class Register:
 				self.ui.add_vendor_back_button.config(command = lambda: self.reenter_back_button())
 				self.ui.add_vendor_skip_button.grid_forget()
 			case "quantity":
-				self.ui.add_quantity_label.config(text=f"Current quantity is: {self.state_manager.add_item_object.quantity}\nNew quantity will be: ")
+				self.ui.add_quantity_var.set(f"Current quantity is: {self.state_manager.add_item_object.quantity}\nNew quantity will be:")
 				self.state_manager.add_item_index=7
 				self.state_manager.reentering_quantity = True
 				self.state_manager.reentering = False
@@ -632,25 +632,6 @@ class Register:
 		selected_item = self.ui.add_vendor_listbox.get(selected_index)
 		self.ui.vendor_var.set(selected_item)
 		self.on_add_item_enter()
-
-	def run_z(self, event=None):
-		tomorrow = (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')
-		self.ui.popup_label.config(text="NOTE:")
-		self.ui.popup_description_label_var.set(f"You are about to run a 'Z'\nThis will reset the beginning date to:\n{tomorrow}")
-		self.ui.setup_popup_back_confirm()
-		self.ui.popup_frame.tkraise()
-		root.wait_variable(self.state_manager.popup_var)
-		answer = self.state_manager.popup_var.get()
-		if answer == 'Back':
-			self.ui.popup_frame.lower()
-			self.ui.setup_popup_ok()
-			return
-		self.ui.popup_frame.lower()
-		self.ui.setup_popup_ok()
-		self.printer.run_x(None, "Z")
-		self.config.data['tally_begin_date'] = tomorrow
-		self.config.write_out_config()
-
 
 	def process_return(self, event = None):
 		"""Put register into 'return mode'. User can ring up items like a 

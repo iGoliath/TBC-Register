@@ -11,7 +11,8 @@ class LookupItemsFrame(BaseFrame):
 
         self.buttons_frame = tk.Frame(self)
         self.buttons_frame.grid(column = 1, row = 4, sticky='ew')
-
+        self.buttons_frame.columnconfigure(0, weight=1)
+        self.buttons_frame.columnconfigure(1, weight=1)
 
         self.lookup_items_label = tk.Label(
             self, text="Item Lookup", font=("Arial", 50)
@@ -58,7 +59,9 @@ class LookupItemsFrame(BaseFrame):
         self.lookup_items_listbox.config(yscrollcommand= self.lookup_items_scrollbar.set)
         self.lookup_items_scrollbar.config(command = self.lookup_items_listbox.yview)
 
-    def on_show(self):
+    def on_show(self, mode = "register"):
+        if mode == "additem":
+            self.controller.state_manager.looking_up_add_item = True
         self.lookup_items_quantity_spinbox.delete(0, "end")
         self.lookup_items_quantity_spinbox.insert(0, 1)
         self.lookup_items_listbox.delete(0, tk.END)

@@ -21,12 +21,12 @@ class Transaction:
 				(self.nontax, self.pretax, self.tax, self.total, Dec4(self.items_sold), datetime.today().strftime('%Y-%m-%d'),
 				datetime.now().strftime("%H:%M"), self.cash_used, self.cc_used, 0))
 			self.db_cursor.execute('''SELECT MAX(sale_id) FROM sales''')
-			max_sale_id = (self.db_cursor.fetchall()[0])[0]
+			max_sale_id = self.db_cursor.fetchone()[0]
 			for item in self.items_list:
 				self.db_cursor.execute("INSERT OR IGNORE INTO sale_items VALUES(?, ?, ?, ?)",
 					(max_sale_id, item[1], Dec4(item[4]), item[5]))
 				self.db_cursor.execute("SELECT item_quantity FROM inventory WHERE item_barcode = ?", (item[3],))
-				current_quantity = self.db_cursor.fetchall()[0][0]
+				current_quantity = self.db_cursor.fetchone()[0]
 				if not self.returning:
 					self.db_cursor.execute("UPDATE inventory SET item_quantity = ? WHERE item_barcode = ?",
 						(Dec4(current_quantity - item[4]), item[3]))

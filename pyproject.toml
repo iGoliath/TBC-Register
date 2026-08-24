@@ -10,6 +10,8 @@ dependencies = [
   "setuptools<82",
   "python-escpos",
   "pygame",
+  "pyusb",
+  "tkcalendar",
 ]
 
 [tool.setuptools.packages.find]

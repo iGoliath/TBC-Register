@@ -431,11 +431,6 @@ class WidgetManager:
             self.admin_menu_frame, text="Back", font=("Arial", 58),
             command = lambda: self.main_menu_frame.tkraise()
         )
-
-        self.run_z_button = tk.Button(
-            self.admin_menu_frame, text="Run Z", font=("Arial", 58),
-            command = lambda: self.controller.run_z()
-        )
         
         self.run_x_button.grid(column = 0, row = 0, sticky='nsew', pady=2)
         self.new_item_button.grid(column = 1, row = 0, sticky='nsew', pady=2)
@@ -444,7 +439,6 @@ class WidgetManager:
         self.quit_program_button.grid(column = 0, row = 2, sticky='nsew', pady=2)
         self.manage_seasonals_button.grid(column = 1, row = 2, sticky='nsew', pady=2)
         self.admin_menu_back_button.grid(column = 0, row = 3, sticky='nsew', pady=2)
-        self.run_z_button.grid(column = 1, row = 3, sticky='nsew', pady=2)
         
 
         # ================================================
@@ -687,7 +681,7 @@ class WidgetManager:
         
         tk.Button(
             self.add_barcode_frame, text="Lookup Item", font=("Arial", 50),
-            command = lambda: self.show_frame("lookup_items")).grid(
+            command = lambda: self.show_frame("lookup_items", mode = "additem")).grid(
                 column = 1, row = 4, sticky='ew', pady=15
             )
 
@@ -930,9 +924,11 @@ class WidgetManager:
         
 
     def _init_add_quantity_frame(self):
-        self.add_quantity_label = tk.Label(self.add_quantity_frame, text="Please enter item's quantity:", 
+        self.add_quantity_var = tk.StringVar()
+        self.add_quantity_label = tk.Label(self.add_quantity_frame, textvariable=self.add_quantity_var, 
         font=("Arial", 50), width=25)
         self.add_quantity_label.grid(column = 1, row = 0, sticky='ew')
+        self.add_quantity_var.set("Please enter item's quantity:")
 
         self.add_quantity_entry = tk.Entry(
             self.add_quantity_frame, font=("Arial", 50), justify="right",
@@ -985,7 +981,7 @@ class WidgetManager:
         self._init_add_vendor_frame()
         self._init_add_quantity_frame()
         self.add_barcode_frame.tkraise()
-        self.add_quantity_label.config(text="Please enter item's quantity:")
+        self.add_quantity_var.set("Please enter item's quantity:")
         self.reset_add_item_back_buttons()
         self.add_barcode_entry.focus_set()
 

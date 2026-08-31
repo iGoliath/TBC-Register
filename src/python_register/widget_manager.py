@@ -188,12 +188,12 @@ class WidgetManager:
 
         self.register_add_item_yes_button=tk.Button(
             self.register_add_item_yes_no_frame, text="Yes", font=("Arial", 90),
-            command = lambda: self.controller.state_manager.yes_no_var.set("yes"))
+            command = lambda: self.controller.state_mgr.register_yes_no_var.set("yes"))
         self.register_add_item_yes_button.grid(row=0, column=0, sticky='nsew')
 
         self.register_add_item_no_button=tk.Button(
             self.register_add_item_yes_no_frame, text="No",
-            font=("Arial", 90), command = lambda: self.controller.state_manager.yes_no_var.set("no"))
+            font=("Arial", 90), command = lambda: self.controller.state_mgr.register_yes_no_var.set("no"))
         self.register_add_item_no_button.grid(row=0, column=1, sticky='nsew')
 
         # =====================
@@ -491,7 +491,7 @@ class WidgetManager:
 
         self.seasonal_id_button = tk.Button(
             self.seasonal_id_entry_frame, font=("Arial", 50),
-            text="Confirm", command = lambda: self.controller.state_manager.seasonal_id_var.set(self.seasonal_id_entry.get()))
+            text="Confirm", command = lambda: self.controller.state_mgr.seasonal_id_var.set(self.seasonal_id_entry.get()))
         self.seasonal_id_button.grid(column = 1, row = 2, sticky='nsew')
 
         # ===========================
@@ -513,13 +513,13 @@ class WidgetManager:
         self.popup_back_confirm_frame.columnconfigure(1, weight=1, uniform="equal")
         self.popup_back_button = tk.Button(
             self.popup_back_confirm_frame, text="Back", font=("Arial", 50),
-            command = lambda: self.controller.state_manager.popup_var.set("Back")
+            command = lambda: self.controller.state_mgr.popup_var.set("Back")
         )
         self.popup_back_button.grid(column = 0, row = 0, sticky='nsew')
 
         self.popup_confirm_button = tk.Button(
             self.popup_back_confirm_frame, text="Confirm", font=("Arial", 50),
-            command = lambda: self.controller.state_manager.popup_var.set("Confirm")
+            command = lambda: self.controller.state_mgr.popup_var.set("Confirm")
         )
         
         self.popup_confirm_button.grid(column = 1 , row = 0, sticky='nsew')
@@ -808,9 +808,11 @@ class WidgetManager:
         self.add_category_listbox.config(yscrollcommand= add_category_scrollbar.set)
         add_category_scrollbar.config(command = self.add_category_listbox.yview)
 
-        categories = self.controller.state_manager.cursor.execute('''SELECT category_name from categories where parent_id IS NULL''').fetchall()
-        for category in categories:
-            self.add_category_listbox.insert(tk.END, category[0])
+        categories = self.controller.state_mgr.cursor.execute('''SELECT category_name from categories where parent_id IS NULL''').fetchall()
+        list_categories = sorted([categories[i]['category_name'] for i in range(0, len(categories))])
+
+        for category in list_categories:
+            self.add_category_listbox.insert(tk.END, category)
 
         tk.Button(
             self.add_category_frame, text="Next", font=("Arial", 50),
@@ -891,7 +893,7 @@ class WidgetManager:
         self.add_vendor_listbox.config(yscrollcommand= add_vendor_scrollbar.set)
         add_vendor_scrollbar.config(command = self.add_vendor_listbox.yview)
 
-        vendors = self.controller.state_manager.cursor.execute('''SELECT vendor_name from vendors''').fetchall()
+        vendors = self.controller.state_mgr.cursor.execute('''SELECT vendor_name from vendors''').fetchall()
         for vendor in vendors:
             self.add_vendor_listbox.insert(tk.END, vendor[0])
 
@@ -962,8 +964,8 @@ class WidgetManager:
     def populate_subcategory_listbox(self, primary_category):
         self.add_subcategory_listbox.delete(0, tk.END)
 
-        category_id = self.controller.state_manager.cursor.execute('''SELECT category_id from categories where category_name = ?''', (primary_category, )).fetchone()['category_id']
-        subcategories = self.controller.state_manager.cursor.execute('''SELECT category_name from categories where parent_id = ?''', (category_id, )).fetchall()
+        category_id = self.controller.state_mgr.cursor.execute('''SELECT category_id from categories where category_name = ?''', (primary_category, )).fetchone()['category_id']
+        subcategories = self.controller.state_mgr.cursor.execute('''SELECT category_name from categories where parent_id = ?''', (category_id, )).fetchall()
         if subcategories == []:
             self.add_subcategory_listbox.insert(tk.END, 'None')            
         else:
@@ -1060,15 +1062,15 @@ class WidgetManager:
     def setup_coupon(self):
         self.update_entry(self.coupon_entry, "$0.00")
         self.coupon_reason_entry.delete(0, tk.END)
-        self.update_entry(self.balance_entry, f'${self.controller.state_manager.trans.total:.2f}')
+        self.update_entry(self.balance_entry, f'${self.controller.state_mgr.trans.total:.2f}')
         self.register_frame.tkraise()
         self.invisible_entry.focus_set()
         
 
     def quit_program(self):
-        self.controller.state_manager.conn.commit()
-        self.controller.state_manager.conn.close()
-        del self.controller.state_manager
+        self.controller.state_mgr.conn.commit()
+        self.controller.state_mgr.conn.close()
+        del self.controller.state_mgr
         del self.controller
         self.root.quit()
         self.root.destroy()

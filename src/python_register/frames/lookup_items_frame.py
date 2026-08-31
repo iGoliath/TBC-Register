@@ -61,7 +61,7 @@ class LookupItemsFrame(BaseFrame):
 
     def on_show(self, mode = "register"):
         if mode == "additem":
-            self.controller.state_manager.looking_up_add_item = True
+            self.controller.state_mgr.looking_up_add_item = True
         self.lookup_items_quantity_spinbox.delete(0, "end")
         self.lookup_items_quantity_spinbox.insert(0, 1)
         self.lookup_items_listbox.delete(0, tk.END)
@@ -70,14 +70,15 @@ class LookupItemsFrame(BaseFrame):
 
     def on_item_lookup(self, *args):
 
-        names = self.controller.state_manager.grab_names_like(self.lookup_items_entry.get())
+        names = self.controller.state_mgr.grab_names_like(self.lookup_items_entry.get())
         self.lookup_items_listbox.delete(0, tk.END)
 
         for name in names:
             self.lookup_items_listbox.insert(tk.END, f'{name[0]}')
 
+
     def confirm_lookup_items(self):
         index = self.lookup_items_listbox.curselection()
         name = self.lookup_items_listbox.get(index).strip()
-        barcode = self.controller.state_manager.grab_barcode_given_name(name)
+        barcode = self.controller.state_mgr.grab_barcode_given_name(name)
         self.controller.handle_lookup_confirmed(barcode, Decimal(self.lookup_items_quantity_spinbox.get()))

@@ -103,9 +103,9 @@ class BrowseTransactionsFrame(BaseFrame):
         '''Setup necessary information for browse transaction frame. If voiding,
         set up those widgets as well. Returns boolean dependant on whether or not
         there are transactions in the database.'''
-        self.controller.state_manager.cursor.execute(
+        self.controller.state_mgr.cursor.execute(
             '''SELECT * FROM sales WHERE sale_id = (SELECT MAX(sale_id) FROM SALES)''')
-        results = self.controller.state_manager.cursor.fetchone()
+        results = self.controller.state_mgr.cursor.fetchone()
         if results == None:
             return False
         else:
@@ -132,8 +132,8 @@ class BrowseTransactionsFrame(BaseFrame):
     def browse_transactions(self, *args):
         '''Called when browse_index is written to. Move info to current index.'''
         self.entry.delete(0, tk.END)
-        if not self.controller.state_manager.browsing_seasonals:
-            self.controller.state_manager.cursor.execute(
+        if not self.controller.state_mgr.browsing_seasonals:
+            self.controller.state_mgr.cursor.execute(
                 '''SELECT * FROM sales WHERE sale_id = ?''', (self.browse_index.get(), )
             )
         else:
@@ -141,7 +141,7 @@ class BrowseTransactionsFrame(BaseFrame):
                 '''SELECT * FROM seasonals WHERE seasonal_id = ?''', (self.browse_index.get(), )
             )
 
-        results = self.controller.state_manager.cursor.fetchone()
+        results = self.controller.state_mgr.cursor.fetchone()
         if not results:
             if self.browse_index.get() == 0:
                 self.browse_index.set(1)
@@ -150,16 +150,16 @@ class BrowseTransactionsFrame(BaseFrame):
                 self.browse_index.set(self.browse_index.get() - 1)
                 return
         
-        if not self.controller.state_manager.browsing_seasonals:
+        if not self.controller.state_mgr.browsing_seasonals:
             self.controller.print_transaction_info(self.text, list(results))
         else:
             self.ui.print_seasonal_info(results)
 
     def browse_print_receipt(self):
-        self.controller.state_manager.cursor.execute('''SELECT * FROM sales WHERE sale_id = ?''', (self.browse_index.get(), ))
-        transaction_info = self.controller.state_manager.cursor.fetchall()[0]
-        self.controller.state_manager.cursor.execute('''SELECT * FROM sale_items WHERE sale_id = ?''', (self.browse_index.get(), ))
-        item_results = self.controller.state_manager.cursor.fetchall()
+        self.controller.state_mgr.cursor.execute('''SELECT * FROM sales WHERE sale_id = ?''', (self.browse_index.get(), ))
+        transaction_info = self.controller.state_mgr.cursor.fetchall()[0]
+        self.controller.state_mgr.cursor.execute('''SELECT * FROM sale_items WHERE sale_id = ?''', (self.browse_index.get(), ))
+        item_results = self.controller.state_mgr.cursor.fetchall()
         if transaction_info['is_voided'] == 1:
             self.controller.printer.print_receipt("void", item_results, transaction_info)
         elif transaction_info['total'] < 0:
@@ -169,7 +169,7 @@ class BrowseTransactionsFrame(BaseFrame):
         self.wm.return_to_register()
 
     def void_print_pressed(self):
-        if self.controller.state_manager.check_voided(self.browse_index.get()):
+        if self.controller.state_mgr.check_voided(self.browse_index.get()):
             self.wm.popup_description_label_var.set("This transaction has already been voided!")
             self.wm.popup_frame.tkraise()
         else:
@@ -177,15 +177,15 @@ class BrowseTransactionsFrame(BaseFrame):
 
     def finish_void(self):
         try:
-            self.controller.state_manager.set_voided(self.browse_index.get())
-            transaction_info = self.controller.state_manager.get_sale_info(self.browse_index.get())[0]
-            items = self.controller.state_manager.get_sale_items(self.browse_index.get())
+            self.controller.state_mgr.set_voided(self.browse_index.get())
+            transaction_info = self.controller.state_mgr.get_sale_info(self.browse_index.get())[0]
+            items = self.controller.state_mgr.get_sale_items(self.browse_index.get())
             for item in items:
-                current_quantity = self.controller.state_manager.get_item_quantity_id(item['item_id'])
-                self.controller.state_manager.update_quantity(current_quantity + Dec4(item['quantity']), item['item_id'])
-            self.controller.state_manager.conn.commit()
+                current_quantity = self.controller.state_mgr.get_item_quantity_id(item['item_id'])
+                self.controller.state_mgr.update_quantity(current_quantity + Dec4(item['quantity']), item['item_id'])
+            self.controller.state_mgr.conn.commit()
         except sqlite3.Error as e:
-            self.controller.state_manager.conn.rollback()
+            self.controller.state_mgr.conn.rollback()
         finally:
             self.controller.printer.print_receipt("void", items, transaction_info)
             self.remove_void_widgets()

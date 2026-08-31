@@ -13,7 +13,8 @@ sqlite3.register_converter("FOURDECINT", lambda b: Dec4(b.decode()) / Dec4("1000
 
 
 class StateManager:
-    def __init__(self, root_window, database_name, db_connection):
+    def __init__(self, root_window, database_name, db_connection, tax_rate = None):
+        self.tax_rate = tax_rate
         self.add_item_index = self.coupon = 0
         self.sale_items_listbox_index = -1
         self.coupon_reason = ''
@@ -21,6 +22,7 @@ class StateManager:
         self.reentering_quantity = self.browsing_seasonals = self.used_coupon = False 
         self.looking_up_add_item = False
         self.yes_no_var = tk.StringVar(root_window)
+        self.register_yes_no_var = tk.StringVar(root_window)
         self.seasonal_id_var = tk.StringVar(root_window)
         self.return_var = tk.StringVar(root_window)
         self.browse_index = tk.IntVar(root_window)
@@ -37,13 +39,13 @@ class StateManager:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.cursor = self.conn.cursor()
-        self.trans = Transaction(self.conn, self.cursor)
+        self.trans = Transaction(self.conn, self.cursor, self.tax_rate)
         self.add_item_object = AddToInventory(self.conn, self.cursor)
         self.ADD_ITEM_LAST_STEP = 7
         
     def new_transaction(self):
         del self.trans
-        self.trans = Transaction(self.conn, self.cursor)
+        self.trans = Transaction(self.conn, self.cursor, self.tax_rate)
 
     def new_add_item_object(self):
         del self.add_item_object

@@ -380,7 +380,7 @@ class Register:
 			index = selected_index[0]
 			self.remove_items_from_sale(index, True)
 			self.ui.update_entry(self.ui.balance_entry, f"${abs(self.state_mgr.trans.total):.2f}")
-			self.print_to_sevenseg(f"{abs(self.state_manager.trans.total):.2f}")
+			self.print_to_sevenseg(f"{abs(self.state_mgr.trans.total):.2f}")
 			self.ui.sale_items_listbox.delete(0, tk.END)
 			for key in self.state_mgr.trans.items_list.keys():
 				if len(self.state_mgr.trans.items_list[key]['item_name']) > 13:

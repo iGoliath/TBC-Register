@@ -12,6 +12,9 @@ dependencies = [
   "pygame",
   "pyusb",
   "tkcalendar",
+  "luma.core",
+  "luma.led_matrix",
+  "spidev",
 ]
 
 [tool.setuptools.packages.find]

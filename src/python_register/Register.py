@@ -20,11 +20,18 @@ from decimal import *
 from pathlib import Path
 
 import pygame
+from luma.core.interface.serial import spi, noop
+from luma.core.render import canvas
+from luma.core.virtual import sevensegment
+from luma.led_matrix.device import max7219
 
 
 class Register:
 	def __init__(self, root, db_connection = None):
 		"""Initialize UI, StateManager, Config"""
+		serial = spi(port=0, device=0, gpio=noop())
+		device = max7219(serial)
+		self.seg = sevensegment(device)
 		self.config = Config()
 		self.state_mgr = StateManager(root, self.config.data['database_name'], db_connection, self.config.data['tax_amount'])
 		self.state_mgr.sale_items_listbox_var.trace_add('write', self.on_sale_items_listbox_var)
@@ -96,6 +103,7 @@ class Register:
 		pygame.mixer.music.load(self.current_dir / "short-beep.mp3")
 		pygame.mixer.music.play()
 		self.state_mgr.new_transaction()
+		self.print_to_sevenseg("0.00")
 		self.ui.enter_register_frame()
 		return "break"
 	
@@ -133,7 +141,9 @@ class Register:
 	def finish_process_sale(self, total = None, *kwargs):
 		
 		self.ui.invisible_entry.delete(0, tk.END)
+		total = total.quantize(Decimal("0.01"))
 		self.ui.update_entry(self.ui.balance_entry, f'${total.quantize(Decimal("0.01"))}')
+		self.print_to_seven_seg(total)
 		self.ui.sale_items_listbox.delete(0, tk.END)
 		for key in self.state_mgr.trans.items_list.keys():
 			if len(self.state_mgr.trans.items_list[key]['item_name']) > 13:
@@ -312,7 +322,10 @@ class Register:
 		#self.printer.print_receipt("sale", sale_items_list, sale_info, self.state_mgr.trans.cash_tendered, self.state_mgr.trans.cc_tendered)
 		self.ui.sale_items_listbox.delete(0, tk.END)
 		self.state_mgr.new_transaction()
+		self.print_to_sevenseg("0.00")
 
+	def print_to_sevenseg(self, to_print):
+			self.seg.text=f"{' ' * (9 - len(str(to_print)))}{to_print}"
 
 	def complete_decrement(self):
 		self.state_mgr.trans.complete_as_decrement()
@@ -355,6 +368,7 @@ class Register:
 	def cancel_sale(self, event=None):
 		self.ui.invisible_entry.delete(0, tk.END)
 		self.ui.update_entry(self.ui.user_entry, "$0.00")
+		self.print_to_sevenseg("0.00")
 		self.state_mgr.sale_items_listbox_var.set(-1)
 		self.on_sale_items_listbox_var()
 		if self.state_mgr.trans.cash_used != 0 or self.state_mgr.trans.cc_used != 0:
@@ -366,6 +380,7 @@ class Register:
 			index = selected_index[0]
 			self.remove_items_from_sale(index, True)
 			self.ui.update_entry(self.ui.balance_entry, f"${abs(self.state_mgr.trans.total):.2f}")
+			self.print_to_sevenseg(f"{abs(self.state_manager.trans.total):.2f}")
 			self.ui.sale_items_listbox.delete(0, tk.END)
 			for key in self.state_mgr.trans.items_list.keys():
 				if len(self.state_mgr.trans.items_list[key]['item_name']) > 13:
